@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GitHub Releases** workflow (`.github/workflows/release.yml`): push tag `v*` → `poe-trade-flipper-windows.zip`, `poe-trade-flipper-macos.zip`, and `SHA256SUMS-release.txt` on the release.
+- **macOS CI** (`.github/workflows/build-macos.yml`): PyInstaller artifact on `main` (same spec as Windows).
 - **Windows PyInstaller** bundle: `poe-trade-flipper.spec`, `requirements-build.txt`, GitHub Actions **Build Windows** artifact + `SHA256SUMS.txt`; frozen app resolves `templates/` via `sys._MEIPASS`.
 - GitHub **issue templates** (bug report + feature request).
 - Currency **icons** on the Rates page (poe.ninja CDN URLs on `CurrencyRate` and `/api/rates` `icon` fields).

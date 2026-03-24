@@ -46,7 +46,7 @@ Your browser should open **http://127.0.0.1:5000** (shown as localhost). If it d
 
 ---
 
-## Windows executable (optional)
+## Prebuilt binaries (optional)
 
 Maintainers build a **PyInstaller** folder bundle with `poe-trade-flipper.spec`:
 
@@ -55,9 +55,12 @@ pip install -r requirements-build.txt
 pyinstaller poe-trade-flipper.spec
 ```
 
-Run **`dist/poe-trade-flipper/poe-trade-flipper.exe`** — same UI as `python app.py`.
+- **Windows:** run **`dist/poe-trade-flipper/poe-trade-flipper.exe`**.
+- **macOS:** run **`dist/poe-trade-flipper/poe-trade-flipper`** from that folder. Unsigned builds may require **Right-click → Open** the first time (Gatekeeper).
 
-**CI:** the [Build Windows](.github/workflows/build-windows.yml) workflow on `main` produces a downloadable artifact (`poe-trade-flipper-windows`) with **`SHA256SUMS.txt`** next to the exe for release notes.
+**CI on `main`:** [Build Windows](.github/workflows/build-windows.yml) and [Build macOS](.github/workflows/build-macos.yml) attach artifacts with per-folder **`SHA256SUMS.txt`**.
+
+**GitHub Releases:** pushing a version tag like **`v0.2.0`** runs [Release](.github/workflows/release.yml), which publishes **`poe-trade-flipper-windows.zip`**, **`poe-trade-flipper-macos.zip`**, and **`SHA256SUMS-release.txt`** on the release page. Verify zips against the checksum file after download.
 
 ---
 

@@ -17,12 +17,23 @@ pip install -r requirements.txt
 python app.py
 ```
 
-To build the **Windows** PyInstaller folder locally (see `poe-trade-flipper.spec`):
+To build the **PyInstaller** folder locally on **Windows or macOS** (see `poe-trade-flipper.spec`):
 
 ```bash
 pip install -r requirements-build.txt
 pyinstaller poe-trade-flipper.spec
 ```
+
+### Tagged releases (maintainers)
+
+Update **`CHANGELOG.md`** (move `[Unreleased]` into a dated section), then create and push a version tag, for example:
+
+```bash
+git tag -a v0.2.0 -m "Release 0.2.0"
+git push origin v0.2.0
+```
+
+The [Release workflow](.github/workflows/release.yml) builds Windows + macOS bundles and attaches **`poe-trade-flipper-windows.zip`**, **`poe-trade-flipper-macos.zip`**, and **`SHA256SUMS-release.txt`** to the GitHub Release for that tag.
 
 ## Maintaining a fork
 

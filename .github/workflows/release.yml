@@ -1,0 +1,86 @@
+# Tag a version (e.g. v0.2.0), push the tag — uploads Windows + macOS zips + SHA256SUMS-release.txt to a GitHub Release.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: poe-trade-flipper-windows
+            bin: poe-trade-flipper.exe
+          - os: macos-latest
+            artifact: poe-trade-flipper-macos
+            bin: poe-trade-flipper
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - run: pip install -r requirements-build.txt
+
+      - run: pyinstaller poe-trade-flipper.spec
+
+      - name: SHA256 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = "dist/poe-trade-flipper/${{ matrix.bin }}"
+          $h = (Get-FileHash -Algorithm SHA256 $p).Hash
+          "$h  ${{ matrix.bin }}" | Out-File -Encoding ascii dist/poe-trade-flipper/SHA256SUMS.txt
+          Get-Content dist/poe-trade-flipper/SHA256SUMS.txt
+
+      - name: SHA256 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist/poe-trade-flipper
+          shasum -a 256 "${{ matrix.bin }}" | tee SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/poe-trade-flipper/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: poe-trade-flipper-windows
+          path: win
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: poe-trade-flipper-macos
+          path: mac
+
+      - name: Zip archives and checksums
+        run: |
+          set -e
+          (cd win && zip -r ../poe-trade-flipper-windows.zip .)
+          (cd mac && zip -r ../poe-trade-flipper-macos.zip .)
+          sha256sum poe-trade-flipper-windows.zip poe-trade-flipper-macos.zip > SHA256SUMS-release.txt
+          cat SHA256SUMS-release.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            poe-trade-flipper-windows.zip
+            poe-trade-flipper-macos.zip
+            SHA256SUMS-release.txt

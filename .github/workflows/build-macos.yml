@@ -1,5 +1,5 @@
-# Build a Windows onedir bundle (PyInstaller). Artifacts attached per run; use for releases + SHA256.
-name: Build Windows
+# Build a macOS onedir bundle (PyInstaller). Artifact for testing; Releases use release.yml on tags.
+name: Build macOS
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
 
 jobs:
   pyinstaller:
-    runs-on: windows-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -33,15 +33,12 @@ jobs:
       - name: Build
         run: pyinstaller poe-trade-flipper.spec
 
-      - name: SHA256 (exe)
-        shell: pwsh
+      - name: SHA256 (binary)
         run: |
-          $p = "dist/poe-trade-flipper/poe-trade-flipper.exe"
-          $h = (Get-FileHash -Algorithm SHA256 $p).Hash
-          "$h  poe-trade-flipper.exe" | Out-File -Encoding ascii dist/poe-trade-flipper/SHA256SUMS.txt
-          Get-Content dist/poe-trade-flipper/SHA256SUMS.txt
+          cd dist/poe-trade-flipper
+          shasum -a 256 poe-trade-flipper | tee SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: poe-trade-flipper-windows
+          name: poe-trade-flipper-macos
           path: dist/poe-trade-flipper/
