@@ -216,7 +216,7 @@ def api_flips():
 def api_crafting():
     game = cfg.get("GAME")
     league = cfg.active_league()
-    full_craft = getattr(config, "FETCH_CRAFTING_FULL_SWEEP", True)
+    full_craft = bool(cfg.get("FETCH_CRAFTING_FULL_SWEEP"))
     items = ninja.get_all_crafting_items(league, game) if full_craft else []
     cur = ninja.get_currency_rates(league, game)
     cpe = get_chaos_per_exalted(cur)
@@ -277,8 +277,8 @@ def api_convert_tricks():
     poe2 = game == "poe2"
     essence: list = []
     tattoo_colors: dict = {}
-    fetch_ess = getattr(config, "FETCH_POE1_ESSENCE_EXCHANGE", True)
-    fetch_tat = getattr(config, "FETCH_POE1_TATTOO_OVERVIEW", True)
+    fetch_ess = bool(cfg.get("FETCH_POE1_ESSENCE_EXCHANGE"))
+    fetch_tat = bool(cfg.get("FETCH_POE1_TATTOO_OVERVIEW"))
     if game == "poe1":
         if fetch_ess:
             try:
@@ -326,17 +326,25 @@ def api_settings_post():
     if not key:
         return jsonify({"error": "missing key"}), 400
 
-    # Find the type from schema (type is stored as name string: "int"/"float"/"str")
+    # Find the type from schema (type is stored as name string: "int"/"float"/"str"/"bool")
     type_map = {"int": int, "float": float, "str": str}
     schema_map = {row["key"]: row["type"] for row in cfg.all_values()}
     if key not in schema_map:
         return jsonify({"error": f"unknown key: {key}"}), 400
 
-    typ = type_map.get(schema_map[key], str)
-    try:
-        typed_value = typ(value)
-    except (ValueError, TypeError):
-        return jsonify({"error": f"expected {schema_map[key]}"}), 400
+    typ_name = schema_map[key]
+    if typ_name == "bool":
+        if isinstance(value, bool):
+            typed_value = value
+        else:
+            s = str(value).strip().lower()
+            typed_value = s in ("1", "true", "yes", "on")
+    else:
+        typ = type_map.get(typ_name, str)
+        try:
+            typed_value = typ(value)
+        except (ValueError, TypeError):
+            return jsonify({"error": f"expected {typ_name}"}), 400
 
     cfg.set_value(key, typed_value)
     ninja.clear_cache()

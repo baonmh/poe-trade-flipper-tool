@@ -25,6 +25,13 @@ class TestAppSmoke(unittest.TestCase):
         self.assertIsInstance(data, dict)
         self.assertIn("settings", data)
 
+    def test_api_settings_includes_fetch_flag_types(self) -> None:
+        r = self.client.get("/api/settings")
+        by_key = {s["key"]: s for s in r.get_json()["settings"]}
+        self.assertEqual(by_key["FETCH_CRAFTING_FULL_SWEEP"]["type"], "bool")
+        self.assertEqual(by_key["FETCH_POE1_ESSENCE_EXCHANGE"]["type"], "bool")
+        self.assertEqual(by_key["FETCH_POE1_TATTOO_OVERVIEW"]["type"], "bool")
+
 
 if __name__ == "__main__":
     unittest.main()

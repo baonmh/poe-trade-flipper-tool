@@ -23,9 +23,9 @@ All traffic is **read-only** HTTPS. No Path of Exile login.
 
 `clear_cache()` (settings save / user refresh) clears both layers.
 
-## Feature flags (`config.py`)
+## Feature flags (`config.py` + Settings)
 
-Optional **booleans** (default **`True`**) to skip extra poe.ninja work on slow or metered connections. Restart the app after editing.
+Optional **booleans** (default **`True`**) to skip extra poe.ninja work on slow or metered connections. Set in **`config.py`** or the in-app **Settings** page (persisted in `settings.json`); changing in the UI applies on the next API call (cache cleared on save).
 
 | Flag | When `False` |
 |------|----------------|

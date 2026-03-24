@@ -25,6 +25,9 @@ SCHEMA: list[tuple[str, str, type, str]] = [
     ("Max Buy — POE1 (chaos)", "MAX_BUY_COST_CHAOS", float, "POE1: hide rates/flips if buy cost exceeds this (0 = unlimited)"),
     ("Max Buy — POE2 (exalted)", "MAX_BUY_COST_EXALTED", float, "POE2: hide rates/flips if buy cost exceeds this (0 = unlimited)"),
     ("Refresh Interval (s)", "AUTO_REFRESH_INTERVAL", int,   "Auto-refresh interval (watch mode)"),
+    ("Fetch POE1 Essence exchange", "FETCH_POE1_ESSENCE_EXCHANGE", bool, "POE1 Convert Tricks: extra Essence exchange (many /details). Off = faster, less coverage."),
+    ("Fetch POE1 Tattoo overview", "FETCH_POE1_TATTOO_OVERVIEW", bool, "POE1 Convert Tricks: Tattoo exchange overview (colour hints)."),
+    ("Fetch full Crafting sweep", "FETCH_CRAFTING_FULL_SWEEP", bool, "Crafting tab: all item categories. Off = empty hotspots/bulk (saves many HTTP calls)."),
 ]
 
 # Runtime overrides dict — starts from config.py defaults

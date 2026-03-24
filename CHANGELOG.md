@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings UI** checkboxes for fetch flags (same keys as **`config.py`**); POE1-only flags hidden when game is POE2; **`settings.example.json`** includes the three booleans.
 - **`config.py` feature flags** (default `True`): **`FETCH_POE1_ESSENCE_EXCHANGE`**, **`FETCH_POE1_TATTOO_OVERVIEW`**, **`FETCH_CRAFTING_FULL_SWEEP`** — skip extra poe.ninja work for Convert Tricks / Crafting on slow connections; API **`meta`** exposes effective flags; subtitles hint when disabled.
+
+### Changed
+
+- Effective fetch flags read from **`settings`** overrides (`cfg.get`) so UI and `settings.json` apply; **`bool`** supported in **`POST /api/settings`**.
 
 ## [0.2.0] — 2026-03-25
 

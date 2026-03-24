@@ -1873,7 +1873,7 @@ function renderCraftingPage(data, opts) {
     else if (stale && data.savedAt) line += ' · cached ' + new Date(data.savedAt).toLocaleString();
     line += ' · Demand-ranked materials';
     if (m.crafting_full_sweep === false) {
-      line += ' · Full crafting sweep off (FETCH_CRAFTING_FULL_SWEEP in config.py)';
+      line += ' · Full crafting sweep off (Settings or config.py)';
     }
     sub.textContent = line;
   }
@@ -2227,7 +2227,7 @@ function renderConvertTricksPage(data, opts) {
       const p = [];
       if (m.fetch_poe1_essence_exchange === false) p.push('Essence exchange fetch off');
       if (m.fetch_poe1_tattoo_overview === false) p.push('Tattoo overview off');
-      line += ' · ' + p.join(', ') + ' (config.py)';
+      line += ' · ' + p.join(', ') + ' (Settings or config.py)';
     }
     sub.textContent = line;
   }
@@ -2493,6 +2493,7 @@ function renderSettings(rows, leaguesForActiveGame) {
   const filtered = rows.filter(r => {
     if (r.key === 'LEAGUE_POE1') return game === 'poe1';
     if (r.key === 'LEAGUE_POE2') return game === 'poe2';
+    if (r.key === 'FETCH_POE1_ESSENCE_EXCHANGE' || r.key === 'FETCH_POE1_TATTOO_OVERVIEW') return game === 'poe1';
     return true;
   });
   document.getElementById('settings-grid').innerHTML = filtered.map(row => {
@@ -2500,6 +2501,8 @@ function renderSettings(rows, leaguesForActiveGame) {
       ? '<span class="setting-modified">✎ modified</span>' : '';
     const resetBtn = row.modified
       ? `<button class="btn btn-ghost" onclick="resetSetting('${row.key}')">Reset</button>` : '';
+
+    const defaultStr = row.type === 'bool' ? (row.default ? 'On' : 'Off') : row.default;
 
     let control;
     if (row.key === 'GAME') {
@@ -2518,6 +2521,13 @@ function renderSettings(rows, leaguesForActiveGame) {
         <select class="setting-input" id="input-${row.key}" onchange="saveSettingDirect('${row.key}', this.value)">
           ${options}
         </select>`;
+    } else if (row.type === 'bool') {
+      const checked = !!row.current;
+      control = `
+        <label class="setting-bool" style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+          <input type="checkbox" class="setting-input" id="input-${row.key}" ${checked ? 'checked' : ''} onchange="saveSettingDirect('${row.key}', this.checked)" />
+          <span>On</span>
+        </label>`;
     } else {
       control = `
         <input
@@ -2537,7 +2547,7 @@ function renderSettings(rows, leaguesForActiveGame) {
       <div class="setting-label">${row.label} ${modified}</div>
       <div class="setting-desc">${row.description}</div>
       <div class="setting-row">${control} ${resetBtn}</div>
-      <div class="setting-desc" style="color:var(--dim)">Default: <span style="color:var(--text)">${row.default}</span></div>
+      <div class="setting-desc" style="color:var(--dim)">Default: <span style="color:var(--text)">${defaultStr}</span></div>
     </div>`;
   }).join('');
 }
@@ -2564,6 +2574,10 @@ async function saveSettingDirect(key, value) {
       else if (activePage === 'trade-lab') loadTradeLabPage();
     }
     if (key === 'AUTO_REFRESH_INTERVAL' && activePage === 'rates') startRatesAutoRefresh();
+    if (key === 'FETCH_CRAFTING_FULL_SWEEP' && activePage === 'crafting') loadCraftingInitial();
+    if ((key === 'FETCH_POE1_ESSENCE_EXCHANGE' || key === 'FETCH_POE1_TATTOO_OVERVIEW') && activePage === 'convert-tricks') {
+      loadConvertTricksInitial();
+    }
   } else {
     setStatus('', 'Error: ' + data.error);
   }
