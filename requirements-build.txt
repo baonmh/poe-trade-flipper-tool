@@ -1,0 +1,3 @@
+# Maintainer-only: Windows folder build (PyInstaller). Not required to run from source.
+-r requirements.txt
+pyinstaller==6.11.1

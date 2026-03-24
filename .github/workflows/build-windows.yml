@@ -1,0 +1,47 @@
+# Build a Windows onedir bundle (PyInstaller). Artifacts attached per run; use for releases + SHA256.
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "poe-trade-flipper.spec"
+      - "requirements.txt"
+      - "requirements-build.txt"
+      - "templates/**"
+      - "api/**"
+      - "analysis/**"
+      - ".github/workflows/build-windows.yml"
+
+jobs:
+  pyinstaller:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Install deps + PyInstaller
+        run: pip install -r requirements-build.txt
+
+      - name: Build
+        run: pyinstaller poe-trade-flipper.spec
+
+      - name: SHA256 (exe)
+        shell: pwsh
+        run: |
+          $p = "dist/poe-trade-flipper/poe-trade-flipper.exe"
+          $h = (Get-FileHash -Algorithm SHA256 $p).Hash
+          "$h  poe-trade-flipper.exe" | Out-File -Encoding ascii dist/poe-trade-flipper/SHA256SUMS.txt
+          Get-Content dist/poe-trade-flipper/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: poe-trade-flipper-windows
+          path: dist/poe-trade-flipper/

@@ -17,6 +17,13 @@ pip install -r requirements.txt
 python app.py
 ```
 
+To build the **Windows** PyInstaller folder locally (see `poe-trade-flipper.spec`):
+
+```bash
+pip install -r requirements-build.txt
+pyinstaller poe-trade-flipper.spec
+```
+
 ## Maintaining a fork
 
 If you publish your own build: optional donation link and label live in **`config.py`** (`DONATION_URL`, `DONATION_LABEL`). GitHub’s **Sponsor** menu is configured in **`.github/FUNDING.yml`** ([docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository)).

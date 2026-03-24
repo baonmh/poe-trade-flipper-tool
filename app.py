@@ -1,9 +1,11 @@
 """
 POE2 Flipper — Web UI (Flask)
-Run: python app.py  → opens browser automatically at http://localhost:5000
+Run: python app.py  → opens browser at http://127.0.0.1:5000 (loopback only)
 """
 from __future__ import annotations
 
+import os
+import sys
 import threading
 import webbrowser
 import requests
@@ -28,7 +30,15 @@ from analysis.trade_lab import (
 
 cfg.load()
 
-app = Flask(__name__)
+
+def _app_root() -> str:
+    """Project dir in dev; PyInstaller extract dir when frozen (templates bundled there)."""
+    if getattr(sys, "frozen", False):
+        return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+app = Flask(__name__, template_folder=os.path.join(_app_root(), "templates"))
 
 
 @app.context_processor
@@ -417,9 +427,9 @@ def api_trade_pair_diff():
 # ─── Launch ───────────────────────────────────────────────────────────────────
 
 def open_browser():
-    webbrowser.open("http://localhost:5000")
+    webbrowser.open("http://127.0.0.1:5000")
 
 
 if __name__ == "__main__":
     threading.Timer(1.0, open_browser).start()
-    app.run(debug=False, port=5000)
+    app.run(debug=False, host="127.0.0.1", port=5000)

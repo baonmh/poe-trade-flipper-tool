@@ -42,7 +42,22 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Your browser should open **http://localhost:5000**. If it does not, open that URL manually.
+Your browser should open **http://127.0.0.1:5000** (shown as localhost). If it does not, open that URL manually. The dev server listens on **loopback only** — not exposed on your LAN.
+
+---
+
+## Windows executable (optional)
+
+Maintainers build a **PyInstaller** folder bundle with `poe-trade-flipper.spec`:
+
+```bash
+pip install -r requirements-build.txt
+pyinstaller poe-trade-flipper.spec
+```
+
+Run **`dist/poe-trade-flipper/poe-trade-flipper.exe`** — same UI as `python app.py`.
+
+**CI:** the [Build Windows](.github/workflows/build-windows.yml) workflow on `main` produces a downloadable artifact (`poe-trade-flipper-windows`) with **`SHA256SUMS.txt`** next to the exe for release notes.
 
 ---
 

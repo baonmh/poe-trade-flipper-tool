@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Windows PyInstaller** bundle: `poe-trade-flipper.spec`, `requirements-build.txt`, GitHub Actions **Build Windows** artifact + `SHA256SUMS.txt`; frozen app resolves `templates/` via `sys._MEIPASS`.
 - GitHub **issue templates** (bug report + feature request).
 - Currency **icons** on the Rates page (poe.ninja CDN URLs on `CurrencyRate` and `/api/rates` `icon` fields).
 - Public README, contributing guide, changelog, settings example template, and dependency pins for reproducible installs.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`app.py`**: Flask binds **`127.0.0.1:5000`** (loopback only); browser opens the same URL.
 - **API fetch UX**: `fetchJsonOk` checks HTTP status and surfaces rate-limit / server errors clearly; failed loads show **Retry** on Rates, Flips, Crafting, Convert Tricks, and Trade Lab suggestions.
 - `api/poe_ninja.py`: unified cache/clear through `cache.py`; `config.py` adds `POE_NINJA_CACHE_TTL_SEC` / `POE_NINJA_HTTP_CACHE_TTL_SEC`.
 - README support section simplified for end users; fork/maintainer notes moved to CONTRIBUTING.md; `.github/FUNDING.yml` trimmed to YAML only.

@@ -11,6 +11,7 @@ If you find a security problem in this repository (e.g. unsafe dependency, accid
 ## Good practices for users
 
 - Run from source or trusted release binaries only.
+- The bundled Flask server listens on **127.0.0.1** (loopback) only — it is not meant to be reachable from other machines on your network.
 - Do not paste `settings.json` or screenshots containing personal data in public bug reports if they matter to you.
 - Keep Python and dependencies updated (`pip install -r requirements.txt`).
 

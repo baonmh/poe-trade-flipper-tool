@@ -6,6 +6,7 @@ settings.json
 # ── Python ──────────────────────────────────────────────
 venv/
 .venv/
+.venv-build/
 __pycache__/
 *.py[cod]
 *$py.class
