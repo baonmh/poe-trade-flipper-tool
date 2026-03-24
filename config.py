@@ -24,6 +24,10 @@ POE2_CHALLENGE_LEAGUE_TOKEN = "Fate of the Vaal"
 # === poe.ninja API (avoid 429: sequential /details + delays; tune if needed) ===
 POE_NINJA_DETAIL_DELAY_SEC = 0.12   # pause after each exchange /details request
 POE_NINJA_CATEGORY_PAUSE_SEC = 0.9  # pause after each exchange category completes
+# api/cache.py — merged lists (rates, items, tattoo map, essence list)
+POE_NINJA_CACHE_TTL_SEC = 240
+# Per-GET JSON dedup (0 = off). Reuses identical overview/detail URLs during overlapping refreshes.
+POE_NINJA_HTTP_CACHE_TTL_SEC = 120
 POE_NINJA_BASE = "https://poe.ninja/api/data"
 POE_NINJA_CURRENCY_URL = f"{POE_NINJA_BASE}/currencyoverview"
 POE_NINJA_ITEM_URL = f"{POE_NINJA_BASE}/itemoverview"

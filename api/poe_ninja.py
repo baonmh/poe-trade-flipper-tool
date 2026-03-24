@@ -3,6 +3,7 @@ poe.ninja API Client for POE2 currency and item data.
 """
 from __future__ import annotations
 
+import json
 import random
 import time
 from dataclasses import dataclass, field
@@ -11,6 +12,7 @@ from typing import Any, Optional
 import requests
 
 import config
+from api.cache import cache_clear, get_or_compute
 
 # Game-specific currency endpoints (the legacy /api/data/currencyoverview ignores ?game=).
 _NINJA_ORIGIN = "https://poe.ninja"
@@ -21,9 +23,13 @@ POE1_EXCHANGE_DETAILS_URL = f"{_NINJA_ORIGIN}/poe1/api/economy/exchange/current/
 POE2_EXCHANGE_OVERVIEW_URL = f"{_NINJA_ORIGIN}/poe2/api/economy/exchange/current/overview"
 POE2_EXCHANGE_DETAILS_URL = f"{_NINJA_ORIGIN}/poe2/api/economy/exchange/current/details"
 
-# Simple in-memory cache: {cache_key: (timestamp, data)}
-_cache: dict[str, tuple[float, object]] = {}
-CACHE_TTL = 240  # seconds — full economy fetch is slow; cache longer to avoid hammering poe.ninja
+
+def _cache_ttl() -> float:
+    return float(getattr(config, "POE_NINJA_CACHE_TTL_SEC", 240) or 240)
+
+
+def _http_cache_ttl() -> float:
+    return float(getattr(config, "POE_NINJA_HTTP_CACHE_TTL_SEC", 0) or 0)
 
 
 @dataclass
@@ -101,19 +107,7 @@ class FlipOpportunity:
     note: str = ""
 
 
-def _get_cached(key: str) -> Optional[object]:
-    if key in _cache:
-        ts, data = _cache[key]
-        if time.time() - ts < CACHE_TTL:
-            return data
-    return None
-
-
-def _set_cached(key: str, data: object) -> None:
-    _cache[key] = (time.time(), data)
-
-
-def _request(url: str, params: dict) -> Optional[dict]:
+def _http_get_json(url: str, params: dict) -> Optional[dict]:
     """GET with retries; 429 uses exponential backoff (poe.ninja rate limits parallel bursts)."""
     backoff = 2.0
     max_attempts = 8
@@ -146,6 +140,15 @@ def _request(url: str, params: dict) -> Optional[dict]:
             print(f"[API Error] {e}")
             return None
     return None
+
+
+def _request(url: str, params: dict) -> Optional[dict]:
+    """GET JSON; optional short TTL dedupes identical URLs (see POE_NINJA_HTTP_CACHE_TTL_SEC)."""
+    ttl = _http_cache_ttl()
+    if ttl <= 0:
+        return _http_get_json(url, params)
+    key = f"http|{url}|{json.dumps(params, sort_keys=True)}"
+    return get_or_compute(key, ttl, lambda: _http_get_json(url, params))
 
 
 def _detail_delay() -> None:
@@ -397,51 +400,46 @@ def get_currency_rates(league: str = config.LEAGUE_POE2, game: str = config.GAME
         g = "poe2"
 
     cache_key = f"currency_{g}_{league}"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached  # type: ignore
 
-    if g == "poe1":
-        rates = _fetch_poe1_full_economy(league)
-    else:
-        rates = _fetch_poe2_full_economy(league)
+    def compute() -> list[CurrencyRate]:
+        if g == "poe1":
+            return _fetch_poe1_full_economy(league)
+        return _fetch_poe2_full_economy(league)
 
-    _set_cached(cache_key, rates)
-    return rates
+    return get_or_compute(cache_key, _cache_ttl(), compute)
 
 
 def get_item_prices(item_type: str, league: str = config.LEAGUE_POE2, game: str = config.GAME) -> list[ItemPrice]:
     """Fetch item prices for a given category from poe.ninja."""
     cache_key = f"item_{game}_{league}_{item_type}"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached  # type: ignore
 
-    data = _request(config.POE_NINJA_ITEM_URL, {
-        "league": league,
-        "type": item_type,
-        "language": "en",
-        "game": game,
-    })
-    if not data or "lines" not in data:
-        return []
+    def compute() -> list[ItemPrice]:
+        data = _request(config.POE_NINJA_ITEM_URL, {
+            "league": league,
+            "type": item_type,
+            "language": "en",
+            "game": game,
+        })
+        if not data or "lines" not in data:
+            return []
 
-    items: list[ItemPrice] = []
-    for line in data["lines"]:
-        items.append(ItemPrice(
-            name=line.get("name", "Unknown"),
-            chaos_value=line.get("chaosValue", 0.0),
-            divine_value=line.get("divineValue", 0.0),
-            exalted_value=line.get("exaltedValue", 0.0),
-            count=line.get("count", 0),
-            listing_count=line.get("listingCount", 0),
-            item_type=item_type,
-            icon=line.get("icon", ""),
-        ))
+        items: list[ItemPrice] = []
+        for line in data["lines"]:
+            items.append(ItemPrice(
+                name=line.get("name", "Unknown"),
+                chaos_value=line.get("chaosValue", 0.0),
+                divine_value=line.get("divineValue", 0.0),
+                exalted_value=line.get("exaltedValue", 0.0),
+                count=line.get("count", 0),
+                listing_count=line.get("listingCount", 0),
+                item_type=item_type,
+                icon=line.get("icon", ""),
+            ))
 
-    items.sort(key=lambda i: i.chaos_value, reverse=True)
-    _set_cached(cache_key, items)
-    return items
+        items.sort(key=lambda i: i.chaos_value, reverse=True)
+        return items
+
+    return get_or_compute(cache_key, _cache_ttl(), compute)
 
 
 def get_all_crafting_items(league: str = config.LEAGUE_POE2, game: str = config.GAME) -> list[ItemPrice]:
@@ -472,36 +470,34 @@ def _tattoo_color_from_image(img: str) -> str:
 def get_poe1_tattoo_color_by_name(league: str) -> dict[str, str]:
     """Tattoo name → STR/DEX/INT/Journey/Other from exchange overview metadata (no /details)."""
     cache_key = f"poe1_tattoo_colors_{league}"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached  # type: ignore
 
-    out: dict[str, str] = {}
-    data = _request(POE1_EXCHANGE_OVERVIEW_URL, {"league": league, "type": "Tattoo", "language": "en"})
-    for it in (data or {}).get("items") or []:
-        name = it.get("name") or ""
-        img = str(it.get("image") or "")
-        if name:
-            out[name] = _tattoo_color_from_image(img)
-    _set_cached(cache_key, out)
-    return out
+    def compute() -> dict[str, str]:
+        out: dict[str, str] = {}
+        data = _request(POE1_EXCHANGE_OVERVIEW_URL, {"league": league, "type": "Tattoo", "language": "en"})
+        for it in (data or {}).get("items") or []:
+            name = it.get("name") or ""
+            img = str(it.get("image") or "")
+            if name:
+                out[name] = _tattoo_color_from_image(img)
+        return out
+
+    return get_or_compute(cache_key, _cache_ttl(), compute)
 
 
 def get_poe1_essence_exchange_rates(league: str) -> list[CurrencyRate]:
     """Essences (Deafening, …) — separate exchange category on poe.ninja (not in default POE1 merge)."""
     cache_key = f"poe1_essence_exchange_{league}"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached  # type: ignore
 
-    merged = _fetch_exchange_rates_detailed(
-        league, "Essence", "Essences", "poe1", POE1_EXCHANGE_OVERVIEW_URL, POE1_EXCHANGE_DETAILS_URL,
-    )
-    _category_pause()
-    _set_cached(cache_key, merged)
-    return merged
+    def compute() -> list[CurrencyRate]:
+        merged = _fetch_exchange_rates_detailed(
+            league, "Essence", "Essences", "poe1", POE1_EXCHANGE_OVERVIEW_URL, POE1_EXCHANGE_DETAILS_URL,
+        )
+        _category_pause()
+        return merged
+
+    return get_or_compute(cache_key, _cache_ttl(), compute)
 
 
 def clear_cache() -> None:
     """Clear all cached data to force fresh fetches."""
-    _cache.clear()
+    cache_clear()

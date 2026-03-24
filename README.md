@@ -77,6 +77,12 @@ True in-game roll weights are not public. Shown “EV” is a **uniform baseline
 
 ---
 
+## Architecture (for contributors)
+
+- **`api/poe_ninja.py`** — poe.ninja fetches, parsing, rate limits.
+- **`api/cache.py`** — TTL + single-flight + optional per-HTTP response dedup (see [docs/API.md](docs/API.md)).
+- **`analysis/`** — flip math, crafting, convert tricks, trade lab.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and small PRs are welcome.
