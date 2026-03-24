@@ -80,12 +80,18 @@ def api_rates():
     is_poe2 = game == "poe2"
     primary = "exalted" if is_poe2 else "chaos"
 
+    icon_by_name: dict[str, str] = {}
+    for r in rates:
+        if r.name not in icon_by_name:
+            icon_by_name[r.name] = getattr(r, "icon", "") or ""
+
     rate_rows = []
     for name, val in key_rates.items():
         if val <= 0:
             continue
         rate_rows.append({
             "name": name,
+            "icon": icon_by_name.get(name, ""),
             "chaos_value": val,
             "divine_value": round(val / cpd, 4) if cpd else 0.0,
             "exalted_value": round(val / cpe, 4) if cpe else 0.0,
@@ -101,6 +107,7 @@ def api_rates():
             continue
         row = {
             "name": r.name,
+            "icon": getattr(r, "icon", "") or "",
             "category": getattr(r, "category", "") or "",
             "chaos_equivalent": r.chaos_equivalent,
             "buy_cost": buy_c,

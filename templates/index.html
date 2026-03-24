@@ -352,6 +352,42 @@
   tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
   tbody td.dim { color: var(--dim); }
 
+  .rate-name-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .rate-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+  }
+  .rate-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 3px;
+    display: block;
+  }
+  .rate-icon-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    background: #222;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+  .rate-name-txt { min-width: 0; }
+
   /* ── Value coloring ── */
   .c-gold  { color: var(--gold); }
   .c-cyan  { color: var(--cyan); }
@@ -1225,6 +1261,24 @@ function ftype(t) {
   return `<span class="c-dim" style="font-size:11px">${t}</span>`;
 }
 
+function rateAttr(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+function rateNameEsc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+/** Inline poe.ninja-style icon + name; lazy img with letter fallback. */
+function rateIconInline(url, name) {
+  const letter = (name && name[0]) ? String(name[0]).toUpperCase() : '?';
+  const u = (url || '').trim();
+  const title = rateAttr(name);
+  const nm = rateNameEsc(name);
+  if (!u) {
+    return `<span class="rate-name-row"><span class="rate-icon-fallback" title="${title}">${letter}</span><span class="rate-name-txt">${nm}</span></span>`;
+  }
+  return `<span class="rate-name-row"><span class="rate-icon-wrap"><img class="rate-icon" src=${JSON.stringify(u)} alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'"/><span class="rate-icon-fallback" style="display:none" title="${title}">${letter}</span></span><span class="rate-name-txt">${nm}</span></span>`;
+}
+
 // ── RATES (cache + filter + sort + auto-refresh) ───────────────────────────
 
 let _ratesPayload = null;
@@ -1450,7 +1504,7 @@ function renderRatesPage(data, opts) {
 
   document.getElementById('rates-count').textContent = (data.rates || []).length;
   document.getElementById('rates-body').innerHTML = (data.rates || []).map(r => `<tr>
-        <td class="c-white">${r.name}</td>
+        <td class="c-white">${rateIconInline(r.icon, r.name)}</td>
         <td class="r">${fc(r.chaos_value)}</td>
         <td class="r">${fd(r.divine_value)}</td>
         <td class="r">${fe(r.exalted_value)}</td>
@@ -1482,7 +1536,7 @@ function renderRatesPage(data, opts) {
     return `
       <tr class="${r.spread_pct >= 3 ? 'profit-row' : ''}">
         <td class="c-dim">${r.category || '—'}</td>
-        <td class="c-white">${r.name}</td>
+        <td class="c-white">${rateIconInline(r.icon, r.name)}</td>
         <td class="r">${buy}</td>
         <td class="r">${sell}</td>
         <td class="r">${fpct(r.spread_pct)}</td>

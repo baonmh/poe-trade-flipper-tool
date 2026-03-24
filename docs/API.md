@@ -33,3 +33,10 @@ All traffic is **read-only** HTTPS. No Path of Exile login.
 - Sequential `/details` with `POE_NINJA_DETAIL_DELAY_SEC`.
 - Pause between exchange categories: `POE_NINJA_CATEGORY_PAUSE_SEC`.
 - `_http_get_json` retries with backoff on 429 and network errors.
+
+## Internal JSON (`/api/rates`)
+
+Icons come from poe.ninja overview/detail payloads (CDN URLs, normalized in `api/poe_ninja.py`).
+
+- **`rates[]`** — key currencies: `name`, `icon`, `chaos_value`, `divine_value`, `exalted_value`.
+- **`all_rates[]`** — filtered economy rows: `name`, `icon`, `category`, buy/sell/spread/volume/listings, etc.

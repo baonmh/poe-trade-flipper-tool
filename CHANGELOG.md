@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Currency **icons** on the Rates page (poe.ninja CDN URLs on `CurrencyRate` and `/api/rates` `icon` fields).
 - Public README, contributing guide, changelog, settings example template, and dependency pins for reproducible installs.
 - `api/cache.py`: TTL cache + single-flight for poe.ninja; optional HTTP GET dedup (`POE_NINJA_HTTP_CACHE_TTL_SEC`); `docs/API.md` inventory.
 - **About** modal + optional donation header link from `config.py` (`DONATION_URL`, `DONATION_LABEL`, `GITHUB_REPO_URL`); README “Support the project” section (PayPal / PayPal.me only).

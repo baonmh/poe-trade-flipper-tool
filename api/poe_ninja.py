@@ -48,6 +48,7 @@ class CurrencyRate:
     # POE2: chaos / divine / exalted ids present in exchange details pairs (trusted routing).
     anchors: frozenset[str] = field(default_factory=frozenset)
     category: str = ""
+    icon: str = ""
 
     @property
     def buy_cost_chaos(self) -> float:
@@ -165,6 +166,20 @@ def _category_pause() -> None:
         time.sleep(d)
 
 
+def _normalize_icon_url(raw: Optional[str]) -> str:
+    """poe.ninja sometimes returns relative CDN paths; normalize to absolute HTTPS."""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if s.startswith("http://") or s.startswith("https://"):
+        return s
+    if s.startswith("//"):
+        return "https:" + s
+    if s.startswith("/"):
+        return "https://web.poecdn.com" + s
+    return s
+
+
 def _parse_stash_currency_lines(data: dict, category: str = "") -> list[CurrencyRate]:
     """Parse POE1 stash-style currencyoverview JSON (pay/receive, chaosEquivalent)."""
     rates: list[CurrencyRate] = []
@@ -185,6 +200,7 @@ def _parse_stash_currency_lines(data: dict, category: str = "") -> list[Currency
             receive_listings=recv.get("listing_count", 0),
             anchors=anchors,
             category=category,
+            icon=_normalize_icon_url(line.get("icon")),
         ))
     rates.sort(key=lambda r: r.chaos_equivalent, reverse=True)
     return rates
@@ -211,6 +227,7 @@ def _parse_stash_item_lines(data: dict, category: str) -> list[CurrencyRate]:
             receive_listings=max(1, lst - lst // 2) if lst else 1,
             anchors=frozenset({"chaos"}),
             category=category,
+            icon=_normalize_icon_url(line.get("icon")),
         ))
     rates.sort(key=lambda r: r.chaos_equivalent, reverse=True)
     return rates
@@ -333,6 +350,7 @@ def _fetch_exchange_rates_detailed(
         if pay_v <= 0 or recv_v <= 0:
             return None
         name = meta.get("name") or (detail.get("item") or {}).get("name") or "Unknown"
+        icon_raw = (meta.get("icon") if meta else None) or (detail.get("item") or {}).get("icon")
         vol = int(float(line.get("volumePrimaryValue") or 0))
         half = vol // 2
         anchors = frozenset(
@@ -351,6 +369,7 @@ def _fetch_exchange_rates_detailed(
             receive_listings=max(1, vol - half) if anchors else 0,
             anchors=anchors,
             category=category,
+            icon=_normalize_icon_url(icon_raw),
         )
 
     # One category at a time, one /details after another (avoids 429 from parallel bursts).
