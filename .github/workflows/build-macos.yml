@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths:
       - "app.py"
-      - "poe-trade-flipper.spec"
+      - "poe-trade-flipping.spec"
       - "requirements.txt"
       - "requirements-build.txt"
       - "templates/**"
@@ -31,14 +31,14 @@ jobs:
         run: pip install -r requirements-build.txt
 
       - name: Build
-        run: pyinstaller poe-trade-flipper.spec
+        run: pyinstaller poe-trade-flipping.spec
 
       - name: SHA256 (binary)
         run: |
-          cd dist/poe-trade-flipper
-          shasum -a 256 poe-trade-flipper | tee SHA256SUMS.txt
+          cd dist/poe-trade-flipping
+          shasum -a 256 poe-trade-flipping | tee SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: poe-trade-flipper-macos
-          path: dist/poe-trade-flipper/
+          name: poe-trade-flipping-macos
+          path: dist/poe-trade-flipping/

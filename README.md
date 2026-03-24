@@ -1,13 +1,13 @@
-# POE Trade Flipper
+# POE Trade Flipping
 
 Local **Path of Exile (POE1)** and **Path of Exile 2** economy dashboard: browse **currency rates** from [poe.ninja](https://poe.ninja), spot **direct flips**, explore **crafting** hotspots, use **Trade Lab** pair math, and check **convert tricks** (vendor / Harvest / tattoos). Runs in your browser; **no Path of Exile login** and no API keys required.
 
-**Repository:** [github.com/baonmh/poe-trade-flipper-tool](https://github.com/baonmh/poe-trade-flipper-tool)
+**Repository:** [github.com/baonmh/poe-trade-flipping-tool](https://github.com/baonmh/poe-trade-flipping-tool)
 
-[![Tests](https://github.com/baonmh/poe-trade-flipper-tool/actions/workflows/test.yml/badge.svg)](https://github.com/baonmh/poe-trade-flipper-tool/actions/workflows/test.yml)
-[![Build Windows](https://github.com/baonmh/poe-trade-flipper-tool/actions/workflows/build-windows.yml/badge.svg)](https://github.com/baonmh/poe-trade-flipper-tool/actions/workflows/build-windows.yml)
+[![Tests](https://github.com/baonmh/poe-trade-flipping-tool/actions/workflows/test.yml/badge.svg)](https://github.com/baonmh/poe-trade-flipping-tool/actions/workflows/test.yml)
+[![Build Windows](https://github.com/baonmh/poe-trade-flipping-tool/actions/workflows/build-windows.yml/badge.svg)](https://github.com/baonmh/poe-trade-flipping-tool/actions/workflows/build-windows.yml)
 
-**Latest release:** [GitHub Releases](https://github.com/baonmh/poe-trade-flipper-tool/releases/latest) (Windows + macOS zips and checksums when you use a version tag).
+**Latest release:** [GitHub Releases](https://github.com/baonmh/poe-trade-flipping-tool/releases/latest) (Windows + macOS zips and checksums when you use a version tag).
 
 ---
 
@@ -16,11 +16,17 @@ Local **Path of Exile (POE1)** and **Path of Exile 2** economy dashboard: browse
 | Area | What it does |
 |------|----------------|
 | **Rates** | Full economy table with buy/sell chaos (and exalted for POE2), spreads, categories. |
-| **Flips** | Direct currency pair opportunities using the same chaos semantics. |
-| **Crafting** | Top crafting items + bulk flip hints from poe.ninja item categories. |
+| **Flips** | Direct currency pair opportunities using the same chaos semantics; currency column shows poe.ninja icons when available. |
+| **Crafting** | Top crafting items + bulk flip hints from poe.ninja item categories; name column shows item icons when the API provides them. |
 | **Convert tricks** | POE1 vendor loops, Harvest lifeforce math, tattoo 3→1; POE2 liquid emotions & soul cores — with optional manual price overrides (saved in the browser). |
 | **Trade Lab** | Auction-style listing pairs and spread suggestions. |
 | **Settings** | Game (POE1/POE2), leagues, profit/volume thresholds — persisted in `settings.json` when changed in the UI. |
+
+---
+
+## Screenshots
+
+The UI is a single-page dashboard in the browser. To add preview images for GitHub, save PNGs under [`docs/screenshots/`](docs/screenshots/) (see [docs/screenshots/README.md](docs/screenshots/README.md) for suggested filenames and capture tips). When those files exist in the repository, maintainers can embed them here with standard Markdown image syntax.
 
 ---
 
@@ -34,8 +40,8 @@ Local **Path of Exile (POE1)** and **Path of Exile 2** economy dashboard: browse
 ## Quick start
 
 ```bash
-git clone https://github.com/baonmh/poe-trade-flipper-tool.git
-cd poe-trade-flipper-tool
+git clone https://github.com/baonmh/poe-trade-flipping-tool.git
+cd poe-trade-flipping-tool
 
 python -m venv .venv
 # Windows:
@@ -53,19 +59,19 @@ Your browser should open **http://127.0.0.1:5000** (shown as localhost). If it d
 
 ## Prebuilt binaries (optional)
 
-Maintainers build a **PyInstaller** folder bundle with `poe-trade-flipper.spec`:
+Maintainers build a **PyInstaller** folder bundle with `poe-trade-flipping.spec`:
 
 ```bash
 pip install -r requirements-build.txt
-pyinstaller poe-trade-flipper.spec
+pyinstaller poe-trade-flipping.spec
 ```
 
-- **Windows:** run **`dist/poe-trade-flipper/poe-trade-flipper.exe`**.
-- **macOS:** run **`dist/poe-trade-flipper/poe-trade-flipper`** from that folder. Unsigned builds may require **Right-click → Open** the first time (Gatekeeper).
+- **Windows:** run **`dist/poe-trade-flipping/poe-trade-flipping.exe`**.
+- **macOS:** run **`dist/poe-trade-flipping/poe-trade-flipping`** from that folder. Unsigned builds may require **Right-click → Open** the first time (Gatekeeper).
 
 **CI on `main`:** [Build Windows](.github/workflows/build-windows.yml) and [Build macOS](.github/workflows/build-macos.yml) attach artifacts with per-folder **`SHA256SUMS.txt`**.
 
-**GitHub Releases:** pushing a version tag (e.g. **`v0.3.0`**) runs [Release](.github/workflows/release.yml), which publishes **`poe-trade-flipper-windows.zip`**, **`poe-trade-flipper-macos.zip`**, and **`SHA256SUMS-release.txt`** on the release page. Verify zips against the checksum file after download.
+**GitHub Releases:** pushing a version tag (e.g. **`v0.4.0`**) runs [Release](.github/workflows/release.yml), which publishes **`poe-trade-flipping-windows.zip`**, **`poe-trade-flipping-macos.zip`**, and **`SHA256SUMS-release.txt`** on the release page. Verify zips against the checksum file after download.
 
 ---
 
@@ -73,7 +79,8 @@ pyinstaller poe-trade-flipper.spec
 
 - Use the in-app **Settings** page to choose **game**, **league**, and flip filters.
 - Optional: copy `settings.example.json` to `settings.json` in the project root to override defaults before first run (same keys as the UI).
-- **Heavy fetch toggles** (optional): **Settings** page (checkboxes) or **`config.py`** — **`FETCH_POE1_ESSENCE_EXCHANGE`**, **`FETCH_POE1_TATTOO_OVERVIEW`**, **`FETCH_CRAFTING_FULL_SWEEP`** (default on). Turn off to reduce poe.ninja traffic on slow connections — see [docs/API.md](docs/API.md) (“Feature flags”).
+- **Heavy fetch toggles** (optional): **Settings** page (checkboxes) or **`config.py`** — **`FETCH_POE1_*`**, **`FETCH_CRAFTING_FULL_SWEEP`**, **`EXCHANGE_USE_OVERVIEW_ONLY`** (default off). The last one skips per-line **`/details`** on exchange categories so **Rates** load faster but **spreads show ~0%** — see [docs/API.md](docs/API.md) (“Feature flags”).
+- **Economy streaming** (optional): **`config.py`** **`RATES_USE_STREAMING`** / **`FLIPS_USE_STREAMING`** (default **`True`**) — one **SSE** (`/api/economy/stream`) fills **Rates** and **Flips** together **category by category**; **`RATES_STREAM_MAX_SEC`** (default **600**) caps server time; set both flags to **`False`** for separate **`GET /api/rates`** and **`GET /api/flips`**.
 
 League names must match **poe.ninja** for the selected game (e.g. challenge league name for POE1).
 
@@ -103,7 +110,15 @@ True in-game roll weights are not public. Shown “EV” is a **uniform baseline
 
 ## Support the project
 
-Tips are **optional**. You can use **PayPal** via the **Sponsor** button on [the GitHub repository](https://github.com/baonmh/poe-trade-flipper-tool) or the link in the app (**About** → PayPal). Payments are completed on PayPal’s site. This project stays **free and open source** (MIT).
+Tips are **optional**. Use the **Buy me a coffee** link in the app header, the **Sponsor** button on [the GitHub repository](https://github.com/baonmh/poe-trade-flipping-tool), or **About** in the app. This project stays **free and open source** (MIT).
+
+## Getting help
+
+- **Bugs and feature requests:** [GitHub Issues](https://github.com/baonmh/poe-trade-flipping-tool/issues).
+- **Support level:** Best effort — responses are not guaranteed.
+- **Community (optional):** Set **`COMMUNITY_URL`** and **`COMMUNITY_LABEL`** in **`config.py`** to show a link (e.g. Discord) in the app **About** modal. Leave both empty if you do not use a community link.
+
+On first visit, the app may show a short **About** tip; opening **About** or **Dismiss** hides it (stored in the browser).
 
 ## Architecture (for contributors)
 
@@ -115,13 +130,15 @@ Tips are **optional**. You can use **PayPal** via the **Sponsor** button on [the
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and small PRs are welcome.
 
-Run **`python -m unittest discover -s tests -v`** for smoke tests (`/` and `/api/settings`; no network).
+Run **`python -m unittest discover -s tests -v`** for smoke tests (index, settings, mocked economy routes, Trade Lab JSON, cache clear, **offline `/api/leagues`** fallback — no live poe.ninja or GGG calls).
 
 ---
 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md).
+
+**Maintainers:** release process (tag, CI artifacts, checksums) — [RELEASING.md](RELEASING.md).
 
 ---
 

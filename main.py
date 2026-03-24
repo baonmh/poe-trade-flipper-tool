@@ -1,5 +1,5 @@
 """
-POE2 Currency Flipper
+POE Trade Flipping
 ---------------------
 Usage:
   python main.py                # interactive menu
@@ -170,7 +170,7 @@ def view_config_screen() -> None:
 
 MENU = """
 [bold yellow]═══════════════════════════════[/bold yellow]
-[bold]  POE2 Flipper — Main Menu[/bold]
+[bold]  POE Trade Flipping — Main Menu[/bold]
 [bold yellow]═══════════════════════════════[/bold yellow]
   [cyan]1[/cyan]  Currency rates (chaos/div/ex)
   [cyan]2[/cyan]  Flip opportunities
@@ -222,7 +222,7 @@ def main() -> None:
     cfg.load()   # load persisted settings first
 
     parser = argparse.ArgumentParser(
-        description="POE2 Currency Flipper — find profitable trade opportunities"
+        description="POE Trade Flipping — find profitable trade opportunities"
     )
     parser.add_argument(
         "--league",

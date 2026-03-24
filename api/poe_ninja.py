@@ -7,12 +7,18 @@ import json
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Iterator, List, Optional
 
 import requests
 
 import config
-from api.cache import cache_clear, get_or_compute
+import settings as cfg
+from api.cache import cache_clear, cache_set, get_or_compute
+
+
+def _exchange_overview_only() -> bool:
+    """When True, exchange categories skip per-line /details (faster; spreads approximate ~0%)."""
+    return bool(cfg.get("EXCHANGE_USE_OVERVIEW_ONLY"))
 
 # Game-specific currency endpoints (the legacy /api/data/currencyoverview ignores ?game=).
 _NINJA_ORIGIN = "https://poe.ninja"
@@ -115,7 +121,7 @@ def _http_get_json(url: str, params: dict) -> Optional[dict]:
     for attempt in range(max_attempts):
         try:
             resp = requests.get(url, params=params, timeout=35, headers={
-                "User-Agent": "POE2-Flipper/1.0",
+                "User-Agent": "POE-Trade-Flipping/1.0",
             })
             if resp.status_code == 429:
                 if attempt < max_attempts - 1:
@@ -289,6 +295,47 @@ def _overview_line_chaos_hint(line: dict[str, Any], core: dict[str, Any], game: 
     return 0.0
 
 
+def _build_rate_from_overview_only(
+    line: dict[str, Any],
+    meta: dict[str, Any],
+    core: dict[str, Any],
+    game: str,
+    category: str,
+) -> Optional[CurrencyRate]:
+    """Single mid-price from overview row — no /details; buy≈sell so spread ~0%."""
+    ce = _overview_line_chaos_hint(line, core, game)
+    if ce <= 0:
+        return None
+    buy = sell = ce
+    pv_pay = (1.0 / buy) if buy > 0 else 0.0
+    recv_v = sell
+    if pv_pay <= 0 or recv_v <= 0:
+        return None
+    name = meta.get("name") or "Unknown"
+    icon_raw = meta.get("icon")
+    vol = int(float(line.get("volumePrimaryValue") or 0))
+    half = vol // 2
+    mvc = line.get("maxVolumeCurrency")
+    anchors = (
+        frozenset({mvc})
+        if mvc in ("chaos", "divine", "exalted")
+        else frozenset({"chaos"})
+    )
+    return CurrencyRate(
+        name=name,
+        chaos_equivalent=ce,
+        pay_value=pv_pay,
+        receive_value=recv_v,
+        pay_count=half,
+        receive_count=max(0, vol - half),
+        pay_listings=max(1, half) if anchors else 0,
+        receive_listings=max(1, vol - half) if anchors else 0,
+        anchors=anchors,
+        category=category,
+        icon=_normalize_icon_url(icon_raw),
+    )
+
+
 def _buy_sell_chaos(
     line: dict[str, Any],
     pairs: list[dict[str, Any]],
@@ -323,6 +370,16 @@ def _fetch_exchange_rates_detailed(
     lines = overview.get("lines") or []
     items_by_id: dict[str, dict[str, Any]] = {i["id"]: i for i in overview.get("items") or [] if i.get("id")}
     core = overview.get("core") or {}
+    overview_only = _exchange_overview_only()
+
+    def build_rate_from_overview(line: dict[str, Any]) -> Optional[CurrencyRate]:
+        lid = line.get("id")
+        if not lid:
+            return None
+        meta = items_by_id.get(lid)
+        if not meta:
+            return None
+        return _build_rate_from_overview_only(line, meta, core, game, category)
 
     def build_rate(line: dict[str, Any]) -> Optional[CurrencyRate]:
         lid = line.get("id")
@@ -375,7 +432,7 @@ def _fetch_exchange_rates_detailed(
     # One category at a time, one /details after another (avoids 429 from parallel bursts).
     results: list[CurrencyRate] = []
     for line in lines:
-        r = build_rate(line)
+        r = build_rate_from_overview(line) if overview_only else build_rate(line)
         if r is not None:
             results.append(r)
 
@@ -383,33 +440,121 @@ def _fetch_exchange_rates_detailed(
     return results
 
 
-def _fetch_poe1_full_economy(league: str) -> list[CurrencyRate]:
+def _stream_deadline() -> float:
+    sec = float(getattr(config, "RATES_STREAM_MAX_SEC", 600) or 600)
+    return time.time() + max(30.0, sec)
+
+
+def _check_stream_deadline(deadline: float) -> None:
+    if time.time() > deadline:
+        raise TimeoutError(
+            "Rates fetch exceeded RATES_STREAM_MAX_SEC — try Exchange overview-only in Settings or a quieter time."
+        )
+
+
+def _iter_poe1_economy_batches(
+    league: str,
+    deadline: Optional[float],
+) -> Iterator[tuple[int, int, str, list[CurrencyRate]]]:
+    sc_types = getattr(config, "POE1_STASH_CURRENCY_TYPES", [])
+    ex_types = getattr(config, "POE1_EXCHANGE_TYPES", [])
+    si_types = getattr(config, "POE1_STASH_ITEM_TYPES", [])
+    total = max(1, 1 + len(ex_types) + (1 if si_types else 0))
     merged: list[CurrencyRate] = []
-    for ninja_type, label in getattr(config, "POE1_STASH_CURRENCY_TYPES", []):
+    idx = 0
+    if deadline is not None:
+        _check_stream_deadline(deadline)
+    for ninja_type, label in sc_types:
         data = _request(POE1_STASH_CURRENCY_URL, {"league": league, "type": ninja_type})
         if data and data.get("lines") is not None:
             merged.extend(_parse_stash_currency_lines(data, category=label))
-    for ninja_type, label in getattr(config, "POE1_EXCHANGE_TYPES", []):
+    idx += 1
+    merged.sort(key=lambda x: x.chaos_equivalent, reverse=True)
+    yield (idx, total, "Stash currency", list(merged))
+
+    for ninja_type, label in ex_types:
+        if deadline is not None:
+            _check_stream_deadline(deadline)
         merged.extend(_fetch_exchange_rates_detailed(
             league, ninja_type, label, "poe1", POE1_EXCHANGE_OVERVIEW_URL, POE1_EXCHANGE_DETAILS_URL,
         ))
         _category_pause()
-    for ninja_type, label in getattr(config, "POE1_STASH_ITEM_TYPES", []):
-        data = _request(POE1_STASH_ITEM_URL, {"league": league, "type": ninja_type})
-        if data and data.get("lines") is not None:
-            merged.extend(_parse_stash_item_lines(data, category=label))
-    return merged
+        idx += 1
+        merged.sort(key=lambda x: x.chaos_equivalent, reverse=True)
+        yield (idx, total, label, list(merged))
+
+    if si_types:
+        if deadline is not None:
+            _check_stream_deadline(deadline)
+        for ninja_type, label in si_types:
+            data = _request(POE1_STASH_ITEM_URL, {"league": league, "type": ninja_type})
+            if data and data.get("lines") is not None:
+                merged.extend(_parse_stash_item_lines(data, category=label))
+        idx += 1
+        merged.sort(key=lambda x: x.chaos_equivalent, reverse=True)
+        yield (idx, total, "Stash items", list(merged))
 
 
-def _fetch_poe2_full_economy(league: str) -> list[CurrencyRate]:
+def _iter_poe2_economy_batches(
+    league: str,
+    deadline: Optional[float],
+) -> Iterator[tuple[int, int, str, list[CurrencyRate]]]:
+    types_list = getattr(config, "POE2_ECONOMY_TYPES", [])
+    total = len(types_list)
+    if total <= 0:
+        return
     merged: list[CurrencyRate] = []
-    for ninja_type, label in getattr(config, "POE2_ECONOMY_TYPES", []):
+    for i, (ninja_type, label) in enumerate(types_list, start=1):
+        if deadline is not None:
+            _check_stream_deadline(deadline)
         merged.extend(_fetch_exchange_rates_detailed(
             league, ninja_type, label, "poe2", POE2_EXCHANGE_OVERVIEW_URL, POE2_EXCHANGE_DETAILS_URL,
         ))
-        _category_pause()
-    merged.sort(key=lambda x: x.chaos_equivalent, reverse=True)
-    return merged
+        if i < total:
+            _category_pause()
+        merged.sort(key=lambda x: x.chaos_equivalent, reverse=True)
+        yield (i, total, label, list(merged))
+
+
+def iter_currency_rates_batches(league: str, game: str) -> Iterator[tuple[int, int, str, list[CurrencyRate]]]:
+    """
+    Yield (1-based index, total_batches, category_label, accumulated_rates) after each batch.
+    Used by SSE /api/economy/stream (rates + flips share one pass) so the UI can render category-by-category.
+    """
+    g = (game or "poe2").lower()
+    if g not in ("poe1", "poe2"):
+        g = "poe2"
+    deadline = _stream_deadline()
+    if g == "poe1":
+        yield from _iter_poe1_economy_batches(league, deadline)
+    else:
+        yield from _iter_poe2_economy_batches(league, deadline)
+
+
+def store_currency_rates_cache(league: str, game: str, rates: list[CurrencyRate]) -> None:
+    """Write merged rates into the same TTL key as get_currency_rates (after streaming completes)."""
+    g = (game or "poe2").lower()
+    if g not in ("poe1", "poe2"):
+        g = "poe2"
+    ov = 1 if _exchange_overview_only() else 0
+    cache_key = f"currency_{g}_{league}_ov{ov}"
+    ttl = _cache_ttl()
+    if ttl > 0:
+        cache_set(cache_key, rates)
+
+
+def _fetch_poe1_full_economy(league: str) -> list[CurrencyRate]:
+    last: list[CurrencyRate] = []
+    for _i, _t, _l, merged in _iter_poe1_economy_batches(league, None):
+        last = merged
+    return last
+
+
+def _fetch_poe2_full_economy(league: str) -> list[CurrencyRate]:
+    last: list[CurrencyRate] = []
+    for _i, _t, _l, merged in _iter_poe2_economy_batches(league, None):
+        last = merged
+    return last
 
 
 def get_currency_rates(league: str = config.LEAGUE_POE2, game: str = config.GAME) -> list[CurrencyRate]:
@@ -418,7 +563,8 @@ def get_currency_rates(league: str = config.LEAGUE_POE2, game: str = config.GAME
     if g not in ("poe1", "poe2"):
         g = "poe2"
 
-    cache_key = f"currency_{g}_{league}"
+    ov = 1 if _exchange_overview_only() else 0
+    cache_key = f"currency_{g}_{league}_ov{ov}"
 
     def compute() -> list[CurrencyRate]:
         if g == "poe1":
@@ -452,7 +598,7 @@ def get_item_prices(item_type: str, league: str = config.LEAGUE_POE2, game: str 
                 count=line.get("count", 0),
                 listing_count=line.get("listingCount", 0),
                 item_type=item_type,
-                icon=line.get("icon", ""),
+                icon=_normalize_icon_url(line.get("icon")),
             ))
 
         items.sort(key=lambda i: i.chaos_value, reverse=True)
@@ -461,16 +607,33 @@ def get_item_prices(item_type: str, league: str = config.LEAGUE_POE2, game: str 
     return get_or_compute(cache_key, _cache_ttl(), compute)
 
 
+def iter_crafting_item_batches(league: str, game: str) -> Iterator[tuple[int, int, str, List[ItemPrice]]]:
+    """
+    Yield (index, total, category_name, accumulated items) after each CRAFTING_CATEGORIES fetch.
+    """
+    cats = list(getattr(config, "CRAFTING_CATEGORIES", []) or [])
+    total = max(1, len(cats))
+    acc: list[ItemPrice] = []
+    deadline = _stream_deadline()
+    if not cats:
+        yield (1, 1, "(none)", [])
+        return
+    for i, category in enumerate(cats, start=1):
+        if deadline is not None:
+            _check_stream_deadline(deadline)
+        items = get_item_prices(category, league, game)
+        acc.extend(items)
+        acc.sort(key=lambda x: x.chaos_value * x.count, reverse=True)
+        time.sleep(0.2)
+        yield (i, total, str(category), list(acc))
+
+
 def get_all_crafting_items(league: str = config.LEAGUE_POE2, game: str = config.GAME) -> list[ItemPrice]:
     """Fetch items across all crafting categories."""
-    all_items: list[ItemPrice] = []
-    for category in config.CRAFTING_CATEGORIES:
-        items = get_item_prices(category, league, game)
-        all_items.extend(items)
-        time.sleep(0.2)  # polite delay between requests
-
-    all_items.sort(key=lambda i: i.chaos_value * i.count, reverse=True)
-    return all_items
+    last: list[ItemPrice] = []
+    for _i, _t, _l, merged in iter_crafting_item_batches(league, game):
+        last = merged
+    return last
 
 
 def _tattoo_color_from_image(img: str) -> str:

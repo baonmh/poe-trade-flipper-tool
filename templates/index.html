@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POE2 Currency Flipper</title>
+<title>POE Trade Flipping</title>
 <style>
   :root {
     --bg:       #0e0e0e;
@@ -47,12 +47,45 @@
     top: 0;
     z-index: 100;
   }
+  .header-brand {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    flex: 1;
+    min-width: 0;
+  }
   header h1 {
     font-size: 20px;
     font-weight: 700;
     color: var(--gold);
     letter-spacing: 0.5px;
-    flex: 1;
+    margin: 0;
+    flex: 0 1 auto;
+  }
+  .header-highlight-links {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header-highlight-links a {
+    display: inline-block;
+    background: #2a2010;
+    border: 1px solid var(--gold-dim);
+    border-radius: 4px;
+    padding: 4px 10px;
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    line-height: 1.35;
+  }
+  .header-highlight-links a:hover {
+    border-color: var(--gold);
+    color: var(--white);
+    text-decoration: none;
   }
   .badge {
     background: #2a2010;
@@ -70,15 +103,7 @@
     gap: 0 14px;
     flex-wrap: wrap;
     font-size: 11px;
-  }
-  .header-actions a {
-    color: var(--cyan);
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .header-actions a:hover {
-    text-decoration: underline;
-    color: var(--gold);
+    margin-left: auto;
   }
 
   .about-modal-overlay {
@@ -187,6 +212,20 @@
   .status-dot.ok { background: var(--green); }
   .status-dot.loading { background: var(--gold); animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .first-run-hint {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text);
+    background: rgba(60, 100, 140, 0.14);
+    border-bottom: 1px solid var(--border);
+  }
+  .first-run-hint a { color: var(--cyan); }
 
   /* ── Layout ── */
   .layout {
@@ -806,12 +845,49 @@
   .trade-pair-actions {
     margin-top: 12px;
   }
+
+  /* a11y: keyboard focus rings (avoid clutter on mouse :focus) */
+  a:focus-visible,
+  button:focus-visible,
+  .btn:focus-visible,
+  nav a:focus-visible,
+  .game-switch-btn:focus-visible,
+  #about-link:focus-visible,
+  .header-highlight-links a:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 1px;
+  }
+  select.select-compact:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+    border-color: var(--gold-dim);
+  }
 </style>
 </head>
 <body>
+<script>
+window.__FLIPPER_RATES_STREAM__ = {{ rates_streaming|tojson }};
+window.__FLIPPER_RATES_STREAM_MAX_MS__ = {{ rates_stream_max_ms|tojson }};
+window.__FLIPPER_FLIPS_STREAM__ = {{ flips_streaming|tojson }};
+window.__FLIPPER_CRAFTING_STREAM__ = {{ crafting_streaming|tojson }};
+</script>
 
 <header>
-  <h1>⚗ POE Currency Flipper</h1>
+  <div class="header-brand">
+    <h1>⚗ POE Trade Flipping</h1>
+    <div class="header-highlight-links">
+      <a href="#" id="about-link" onclick="openAboutModal(); return false;" aria-label="About this app">About</a>
+      {% if donation_url %}
+      <a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">{{ donation_label }}</a>
+      {% endif %}
+    </div>
+  </div>
   <div class="game-switch">
     <button class="game-switch-btn" id="btn-poe1" onclick="switchGame('poe1')">POE1</button>
     <button class="game-switch-btn" id="btn-poe2" onclick="switchGame('poe2')">POE2</button>
@@ -824,13 +900,14 @@
   </div>
   <span class="badge" id="league-badge">—</span>
   <div class="header-actions">
-    <a href="#" id="about-link" onclick="openAboutModal(); return false;" aria-label="About this app">About</a>
-    {% if donation_url %}
-    <a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">{{ donation_label }}</a>
-    {% endif %}
-    <span id="status-indicator"><span class="status-dot" id="status-dot"></span><span id="status-text" style="font-size:11px;color:var(--dim)">Ready</span></span>
+    <span id="status-indicator" role="status" aria-live="polite"><span class="status-dot" id="status-dot" aria-hidden="true"></span><span id="status-text" style="font-size:11px;color:var(--dim)">Ready</span></span>
   </div>
 </header>
+
+<div id="first-run-hint" class="first-run-hint" role="region" aria-label="Welcome tip" style="display:none">
+  <span>New here? Open <a href="#" onclick="openAboutModal(); return false;">About</a> for data sources, disclaimers, and tips.</span>
+  <button type="button" class="btn btn-ghost" onclick="dismissFirstRunHint()">Dismiss</button>
+</div>
 
 <div class="layout">
   <nav>
@@ -1191,19 +1268,22 @@
   <a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">GitHub</a>
   {% if donation_url %}
   <span class="sep">·</span>
-  <a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">Support development</a>
+  <a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">{{ donation_label }}</a>
   {% endif %}
 </footer>
 
 <div id="about-modal" class="about-modal-overlay" onclick="if(event.target===this)closeAboutModal()" aria-hidden="true">
   <div class="about-modal-panel" role="dialog" aria-modal="true" aria-labelledby="about-modal-title" aria-describedby="about-modal-disclaimer" onclick="event.stopPropagation()">
-    <h2 id="about-modal-title">POE Trade Flipper</h2>
+    <h2 id="about-modal-title">POE Trade Flipping</h2>
     <p>Local tool for Path of Exile 1 &amp; 2: rates, flips, crafting ideas, and convert tricks. Data comes from <strong>poe.ninja</strong> public APIs — not affiliated with Grinding Gear Games.</p>
     <p id="about-modal-disclaimer">Prices are <strong>indicative</strong> (listing snapshots); live trade prices differ. No game or trade-site login is used.</p>
     <p class="c-dim" style="font-size:12px;margin-bottom:12px">Use the header to pick <strong>POE1 / POE2</strong> and <strong>league</strong>. Open <strong>Settings</strong> for profit thresholds and refresh intervals. Each tab has its own <strong>Refresh</strong> to load data.</p>
     <p><a href="{{ repo_url }}" target="_blank" rel="noopener noreferrer">Source code on GitHub</a> · MIT License</p>
     {% if donation_url %}
-    <p>Optional tip via <strong>PayPal</strong>: <a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">{{ donation_label }}</a> — the app stays free and open source.</p>
+    <p><a href="{{ donation_url }}" target="_blank" rel="noopener noreferrer">{{ donation_label }}</a> — optional; the app stays free and open source.</p>
+    {% endif %}
+    {% if community_url %}
+    <p>Optional <a href="{{ community_url }}" target="_blank" rel="noopener noreferrer">{{ community_label }}</a> — community space (not official support; verify links yourself).</p>
     {% endif %}
     <div class="btn-row">
       <button type="button" class="btn btn-primary" id="about-modal-close" onclick="closeAboutModal()">Close</button>
@@ -1258,7 +1338,18 @@ function escHtml(s) {
 
 /** Fetch JSON from our API; throw Error with a human-readable message on HTTP errors or bad JSON. */
 async function fetchJsonOk(url, init) {
-  const res = await fetch(url, init);
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (err) {
+    const m = err && err.message ? String(err.message) : '';
+    if (/AbortError|aborted/i.test(m)) {
+      throw new Error('Request cancelled.');
+    }
+    throw new Error(
+      'Network error — could not reach the server. Start the app and open http://127.0.0.1:5000 (or check firewall / VPN).'
+    );
+  }
   let data;
   try {
     data = await res.json();
@@ -1268,7 +1359,7 @@ async function fetchJsonOk(url, init) {
     }
     throw new Error(
       res.ok
-        ? 'Unexpected response format from server.'
+        ? 'Unexpected response format from server (not JSON).'
         : 'Bad response (HTTP ' + res.status + '). Is the app still running?'
     );
   }
@@ -1297,7 +1388,48 @@ function loadErrorRetryHtml(message, retryOnclick) {
   return `<div>${m}</div>${btn}`;
 }
 
+/** Read localStorage; copy once from legacy flipper_* key when using flipping_* prefix. */
+function lsGetMigrate(key) {
+  try {
+    let v = localStorage.getItem(key);
+    if (v != null) return v;
+    if (key.startsWith('flipping_')) {
+      const legacy = 'flipper_' + key.slice('flipping_'.length);
+      v = localStorage.getItem(legacy);
+      if (v != null) {
+        try {
+          localStorage.setItem(key, v);
+        } catch (e) {}
+      }
+    }
+    return v;
+  } catch (e) {
+    return null;
+  }
+}
+
+const FIRST_RUN_HINT_KEY = 'flipping_about_hint_dismissed_v1';
+
+function dismissFirstRunHint() {
+  try {
+    localStorage.setItem(FIRST_RUN_HINT_KEY, '1');
+  } catch (e) {}
+  const bar = document.getElementById('first-run-hint');
+  if (bar) bar.style.display = 'none';
+}
+
+function maybeShowFirstRunHint() {
+  try {
+    if (lsGetMigrate(FIRST_RUN_HINT_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  const bar = document.getElementById('first-run-hint');
+  if (bar) bar.style.display = 'flex';
+}
+
 function openAboutModal() {
+  dismissFirstRunHint();
   const el = document.getElementById('about-modal');
   if (!el) return;
   el.classList.add('open');
@@ -1370,6 +1502,27 @@ function rateIconInline(url, name) {
 // ── RATES (cache + filter + sort + auto-refresh) ───────────────────────────
 
 let _ratesPayload = null;
+/** Single SSE for progressive rates + flips (one poe.ninja economy pass). */
+let _economyES = null;
+let _economyTimer = null;
+let _economyUnifiedPromise = null;
+let _economyStreamUserAbort = false;
+let _craftingEventSource = null;
+
+function abortEconomyUnifiedStream() {
+  _economyStreamUserAbort = true;
+  if (_economyTimer) {
+    clearTimeout(_economyTimer);
+    _economyTimer = null;
+  }
+  if (_economyES) {
+    try {
+      _economyES.close();
+    } catch (e) {}
+    _economyES = null;
+  }
+}
+let _tradeSuggestRows = [];
 let _ratesStale = false;
 let _ratesPollTimer = null;
 let _ratesToolbarRestored = false;
@@ -1386,18 +1539,18 @@ function getActiveGameSync() {
 
 function ratesUiStorageKey(game) {
   const g = (game || 'poe2').toString().toLowerCase();
-  return 'flipper_rates_ui_v2_' + g;
+  return 'flipping_rates_ui_v2_' + g;
 }
 
 function ratesCacheKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_rates_v1_' + g + '_' + L;
+  return 'flipping_rates_v1_' + g + '_' + L;
 }
 
 function ratesReadCache(game, league) {
   try {
-    const raw = localStorage.getItem(ratesCacheKey(game, league));
+    const raw = lsGetMigrate(ratesCacheKey(game, league));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (e) {
@@ -1438,7 +1591,7 @@ function ratesUiPersistDebounced() {
 function ratesUiApplyFromStorage(gameOverride) {
   try {
     const g = (gameOverride || getActiveGameSync()).toString().toLowerCase();
-    let raw = localStorage.getItem(ratesUiStorageKey(g));
+    let raw = lsGetMigrate(ratesUiStorageKey(g));
     if (!raw && g === 'poe2') {
       raw = localStorage.getItem('flipper_rates_ui_v1');
       if (raw) {
@@ -1577,6 +1730,10 @@ function renderRatesPage(data, opts) {
   let line = (poe2 ? 'POE2' : 'POE1') + ' · ' + (m.league || '');
   if (data.savedAt && !stale) line += ' · updated ' + new Date(data.savedAt).toLocaleString();
   else if (stale && data.savedAt) line += ' · cached ' + new Date(data.savedAt).toLocaleString();
+  if (m.exchange_overview_only) line += ' · Overview-only exchange (no /details; spreads ~0%)';
+  if (m.stream_progress && !m.stream_done) {
+    line += ' · Loading ' + m.stream_progress.index + '/' + m.stream_progress.total + ': ' + m.stream_progress.category;
+  }
   if (sub) sub.textContent = line;
 
   const pill = document.getElementById('rates-stale-pill');
@@ -1638,7 +1795,21 @@ function renderRatesPage(data, opts) {
   updateLeagueBadge();
 }
 
+function useEconomyUnifiedStreaming() {
+  return (
+    (typeof window.__FLIPPER_RATES_STREAM__ !== 'undefined' && window.__FLIPPER_RATES_STREAM__) ||
+    (typeof window.__FLIPPER_FLIPS_STREAM__ !== 'undefined' && window.__FLIPPER_FLIPS_STREAM__)
+  );
+}
+
 async function loadRatesFetch(showBlockingSpinner) {
+  if (useEconomyUnifiedStreaming()) {
+    return loadEconomyUnifiedStream(showBlockingSpinner);
+  }
+  return loadRatesFetchJson(showBlockingSpinner);
+}
+
+async function loadRatesFetchJson(showBlockingSpinner) {
   const hadCache = !!_ratesPayload;
   if (showBlockingSpinner && !hadCache) {
     setStatus('loading', 'Loading rates…');
@@ -1669,6 +1840,142 @@ async function loadRatesFetch(showBlockingSpinner) {
       document.getElementById('all-rates-body').innerHTML = `<tr><td colspan="8" class="empty c-red">${inner}</td></tr>`;
     }
   }
+}
+
+function loadEconomyUnifiedStream(showBlockingSpinner) {
+  if (_economyUnifiedPromise) {
+    return _economyUnifiedPromise;
+  }
+  const p = new Promise((resolve, reject) => {
+    _economyStreamUserAbort = false;
+    const hadCache = !!_ratesPayload && !!_flipsPayload;
+    const maxMs =
+      typeof window.__FLIPPER_RATES_STREAM_MAX_MS__ === 'number' && window.__FLIPPER_RATES_STREAM_MAX_MS__ > 0
+        ? window.__FLIPPER_RATES_STREAM_MAX_MS__
+        : 600000;
+    let finished = false;
+
+    if (showBlockingSpinner && !hadCache) {
+      setStatus('loading', 'Loading economy (rates + flips)…');
+      document.querySelectorAll('#rates-body, #all-rates-body').forEach(b => {
+        const c = b.id === 'rates-body' ? 4 : 8;
+        b.innerHTML = `<tr><td colspan="${c}" class="empty"><span class="spinner"></span>Fetching from poe.ninja…</td></tr>`;
+      });
+      const db = document.getElementById('direct-body');
+      if (db) {
+        db.innerHTML = `<tr><td colspan="7" class="empty"><span class="spinner"></span>Calculating…</td></tr>`;
+      }
+    } else {
+      setStatus('loading', hadCache ? 'Refreshing economy…' : 'Loading economy…');
+    }
+
+    const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      if (_economyES) {
+        try {
+          _economyES.close();
+        } catch (e) {}
+        _economyES = null;
+      }
+      _economyTimer = null;
+      setStatus('', 'Economy load timed out — falling back to single requests.');
+      Promise.all([loadRatesFetchJson(showBlockingSpinner), loadFlipsFetchJson(showBlockingSpinner)])
+        .then(() => resolve())
+        .catch(reject);
+    }, maxMs);
+    _economyTimer = timer;
+
+    const es = new EventSource('/api/economy/stream');
+    _economyES = es;
+
+    es.onmessage = (ev) => {
+      let data;
+      try {
+        data = JSON.parse(ev.data);
+      } catch (err) {
+        return;
+      }
+      if (data.error) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        _economyTimer = null;
+        try {
+          es.close();
+        } catch (e) {}
+        _economyES = null;
+        setStatus('', 'Error: ' + data.error);
+        Promise.all([loadRatesFetchJson(showBlockingSpinner), loadFlipsFetchJson(showBlockingSpinner)])
+          .then(() => resolve())
+          .catch(reject);
+        return;
+      }
+      const top = data.meta || {};
+      const rates = data.rates;
+      const flips = data.flips;
+      if (rates) {
+        rates.savedAt = new Date().toISOString();
+        _ratesPayload = rates;
+        mergeTradeNamesFromRatesData(rates.all_rates || [], rates.meta && rates.meta.game);
+        syncTradeNamesUiAfterRatesMerge(rates.meta && rates.meta.game);
+        renderRatesPage(rates, { stale: false });
+      }
+      if (flips) {
+        flips.savedAt = new Date().toISOString();
+        _flipsPayload = flips;
+        renderFlipsPage(flips, { stale: false });
+      }
+      if (top.stream_progress) {
+        setStatus(
+          'loading',
+          'Economy ' +
+            top.stream_progress.index +
+            '/' +
+            top.stream_progress.total +
+            ' · ' +
+            top.stream_progress.category
+        );
+      }
+      if (top.stream_done) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        _economyTimer = null;
+        try {
+          es.close();
+        } catch (e) {}
+        _economyES = null;
+        if (rates) ratesWriteCache(rates);
+        if (flips) flipsWriteCache(flips);
+        setStatus('ok', 'Updated ' + new Date().toLocaleTimeString());
+        resolve();
+      }
+    };
+
+    es.onerror = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      _economyTimer = null;
+      try {
+        es.close();
+      } catch (e) {}
+      _economyES = null;
+      if (_economyStreamUserAbort) {
+        _economyStreamUserAbort = false;
+        resolve();
+        return;
+      }
+      Promise.all([loadRatesFetchJson(showBlockingSpinner), loadFlipsFetchJson(showBlockingSpinner)])
+        .then(() => resolve())
+        .catch(reject);
+    };
+  });
+  _economyUnifiedPromise = p.finally(() => {
+    _economyUnifiedPromise = null;
+  });
+  return _economyUnifiedPromise;
 }
 
 async function loadRatesInitial() {
@@ -1741,21 +2048,61 @@ async function getActiveGameLeague() {
   return { game, league };
 }
 
+function clearTradeLabSuggestionsDisplay() {
+  _tradeSuggestRows = [];
+  const tbody = document.getElementById('trade-suggest-body');
+  if (tbody) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" class="empty">Switch game or league, then Refresh suggestions</td></tr>';
+  }
+  const cross = document.getElementById('trade-cross-body');
+  if (cross) cross.innerHTML = '<tr><td colspan="2" class="empty">—</td></tr>';
+}
+
+function clearStaleEconomyTabDom() {
+  const emptyFlips = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+  const db = document.getElementById('direct-body');
+  if (db) db.innerHTML = emptyFlips;
+  const hs = document.getElementById('hotspots-body');
+  const bk = document.getElementById('bulk-body');
+  if (hs) hs.innerHTML = '<tr><td colspan="7" class="empty">Loading…</td></tr>';
+  if (bk) bk.innerHTML = '<tr><td colspan="6" class="empty">Loading…</td></tr>';
+  const ct = document.getElementById('convert-tricks-live-root');
+  if (ct) ct.innerHTML = '<div class="empty">Loading…</div>';
+  clearTradeLabSuggestionsDisplay();
+}
+
+/** Drop in-memory tab payloads and stop SSE so we never show another game/league until reload. */
+function invalidateAllTabPayloadsOnGameChange() {
+  abortEconomyUnifiedStream();
+  if (_craftingEventSource) {
+    try {
+      _craftingEventSource.close();
+    } catch (e) {}
+    _craftingEventSource = null;
+  }
+  _ratesPayload = null;
+  _flipsPayload = null;
+  _craftingPayload = null;
+  _convertTricksPayload = null;
+  clearStaleEconomyTabDom();
+}
+
 function flipsCacheKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_flips_v1_' + g + '_' + L;
+  return 'flipping_flips_v1_' + g + '_' + L;
 }
 
 function craftingCacheKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_crafting_v1_' + g + '_' + L;
+  return 'flipping_crafting_v1_' + g + '_' + L;
 }
 
 function flipsReadCache(game, league) {
   try {
-    const raw = localStorage.getItem(flipsCacheKey(game, league));
+    const raw = lsGetMigrate(flipsCacheKey(game, league));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (e) {
@@ -1775,7 +2122,7 @@ function flipsWriteCache(data) {
 
 function craftingReadCache(game, league) {
   try {
-    const raw = localStorage.getItem(craftingCacheKey(game, league));
+    const raw = lsGetMigrate(craftingCacheKey(game, league));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (e) {
@@ -1796,12 +2143,12 @@ function craftingWriteCache(data) {
 function convertTricksCacheKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_convert_tricks_v4_' + g + '_' + L;
+  return 'flipping_convert_tricks_v4_' + g + '_' + L;
 }
 
 function convertTricksReadCache(game, league) {
   try {
-    const raw = localStorage.getItem(convertTricksCacheKey(game, league));
+    const raw = lsGetMigrate(convertTricksCacheKey(game, league));
     if (!raw) return null;
     return JSON.parse(raw);
   } catch (e) {
@@ -1826,6 +2173,8 @@ let _convertTricksPayload = null;
 function renderFlipsPage(data, opts) {
   const stale = !!(opts && opts.stale);
   const m = data.meta || {};
+  const curGame = getActiveGameSync();
+  if (m.game && String(m.game).toLowerCase() !== curGame) return;
   const poe2 = m.primary === 'exalted';
   const sub = document.getElementById('flips-page-sub');
   if (sub) {
@@ -1853,7 +2202,7 @@ function renderFlipsPage(data, opts) {
   document.getElementById('direct-body').innerHTML = (data.direct || []).map((o, i) => `
       <tr class="${o.profit_pct >= 10 ? 'profit-row' : ''}">
         <td class="c-dim">${i+1}</td>
-        <td class="c-white">${o.sell_currency}</td>
+        <td class="c-white">${rateIconInline(o.icon || '', o.sell_currency)}</td>
         <td class="r">${fmtBuy(o)}</td>
         <td class="r">${fmtSell(o)}</td>
         <td class="r c-green">+${fmtProf(o)}</td>
@@ -1865,6 +2214,8 @@ function renderFlipsPage(data, opts) {
 function renderCraftingPage(data, opts) {
   const stale = !!(opts && opts.stale);
   const m = data.meta || {};
+  const curGame = getActiveGameSync();
+  if (m.game && String(m.game).toLowerCase() !== curGame) return;
   const poe2 = m.primary === 'exalted';
   const sub = document.getElementById('crafting-page-sub');
   if (sub) {
@@ -1891,7 +2242,7 @@ function renderCraftingPage(data, opts) {
     return `
       <tr>
         <td class="c-dim">${i+1}</td>
-        <td class="c-white">${h.name}</td>
+        <td class="c-white">${rateIconInline(h.icon || '', h.name)}</td>
         <td>${ftype(h.type)}</td>
         <td class="r">${pa}</td>
         <td class="r">${pb}</td>
@@ -1904,7 +2255,7 @@ function renderCraftingPage(data, opts) {
   document.getElementById('bulk-body').innerHTML = data.bulk.map((b, i) => `
       <tr>
         <td class="c-dim">${i+1}</td>
-        <td class="c-white">${b.name}</td>
+        <td class="c-white">${rateIconInline(b.icon || '', b.name)}</td>
         <td>${ftype(b.type)}</td>
         <td class="r">${poe2 ? fe(b.exalted_value) : fc(b.chaos_value)}</td>
         <td class="r">${fvol(b.volume)}</td>
@@ -1915,12 +2266,12 @@ function renderCraftingPage(data, opts) {
 function convertTricksManualStorageKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_convert_tricks_manual_v1_' + g + '_' + L;
+  return 'flipping_convert_tricks_manual_v1_' + g + '_' + L;
 }
 
 function readConvertTricksManual(game, league) {
   try {
-    const raw = localStorage.getItem(convertTricksManualStorageKey(game, league));
+    const raw = lsGetMigrate(convertTricksManualStorageKey(game, league));
     return raw ? JSON.parse(raw) : {};
   } catch (e) {
     return {};
@@ -2134,7 +2485,7 @@ function convertTrickTabSlug(cat) {
 function convertTricksTabStorageKey(game, league) {
   const g = (game || 'poe2').toString().toLowerCase();
   const L = String(league || 'Standard').replace(/\s+/g, '_');
-  return 'flipper_convert_tricks_active_tab_v4_' + g + '_' + L;
+  return 'flipping_convert_tricks_active_tab_v4_' + g + '_' + L;
 }
 
 function showConvertTricksTab(tabSlug, el) {
@@ -2215,6 +2566,8 @@ function initConvertTricksManualDelegation() {
 function renderConvertTricksPage(data, opts) {
   const stale = !!(opts && opts.stale);
   const m = data.meta || {};
+  const curGame = getActiveGameSync();
+  if (m.game && String(m.game).toLowerCase() !== curGame) return;
   const poe2 = m.primary === 'exalted';
   const cpe = Number(m.chaos_per_exalted) || 0;
   const sub = document.getElementById('convert-tricks-page-sub');
@@ -2304,7 +2657,7 @@ function renderConvertTricksPage(data, opts) {
 
     const prefer = (() => {
       try {
-        return localStorage.getItem(convertTricksTabStorageKey(m.game, m.league));
+        return lsGetMigrate(convertTricksTabStorageKey(m.game, m.league));
       } catch (e) {
         return null;
       }
@@ -2322,6 +2675,13 @@ function renderConvertTricksPage(data, opts) {
 }
 
 async function loadFlipsFetch(showBlockingSpinner) {
+  if (useEconomyUnifiedStreaming()) {
+    return loadEconomyUnifiedStream(showBlockingSpinner);
+  }
+  return loadFlipsFetchJson(showBlockingSpinner);
+}
+
+async function loadFlipsFetchJson(showBlockingSpinner) {
   const hadCache = !!_flipsPayload;
   if (showBlockingSpinner && !hadCache) {
     setStatus('loading', 'Calculating flips…');
@@ -2352,10 +2712,18 @@ async function loadFlipsInitial() {
   try {
     const { game, league } = await getActiveGameLeague();
     const cached = flipsReadCache(game, league);
-    if (cached && cached.meta && Array.isArray(cached.direct)) {
+    const okCache =
+      cached &&
+      cached.meta &&
+      String(cached.meta.game || '').toLowerCase() === String(game).toLowerCase() &&
+      String(cached.meta.league || 'Standard') === String(league || 'Standard') &&
+      Array.isArray(cached.direct);
+    if (okCache) {
       _flipsPayload = cached;
       renderFlipsPage(cached, { stale: true });
       setStatus('ok', 'Showing cached flips — refreshing…');
+    } else {
+      _flipsPayload = null;
     }
   } catch (e) {}
   await loadFlipsFetch(!_flipsPayload);
@@ -2366,6 +2734,15 @@ async function loadFlips() {
 }
 
 async function loadCraftingFetch(showBlockingSpinner) {
+  const useStream =
+    typeof window.__FLIPPER_CRAFTING_STREAM__ !== 'undefined' && window.__FLIPPER_CRAFTING_STREAM__;
+  if (useStream) {
+    return loadCraftingFetchStream(showBlockingSpinner);
+  }
+  return loadCraftingFetchJson(showBlockingSpinner);
+}
+
+async function loadCraftingFetchJson(showBlockingSpinner) {
   const hadCache = !!_craftingPayload;
   if (showBlockingSpinner && !hadCache) {
     setStatus('loading', 'Loading crafting data…');
@@ -2398,14 +2775,119 @@ async function loadCraftingFetch(showBlockingSpinner) {
   }
 }
 
+function loadCraftingFetchStream(showBlockingSpinner) {
+  return new Promise((resolve, reject) => {
+    const hadCache = !!_craftingPayload;
+    if (_craftingEventSource) {
+      try {
+        _craftingEventSource.close();
+      } catch (e) {}
+      _craftingEventSource = null;
+    }
+    const maxMs =
+      typeof window.__FLIPPER_RATES_STREAM_MAX_MS__ === 'number' && window.__FLIPPER_RATES_STREAM_MAX_MS__ > 0
+        ? window.__FLIPPER_RATES_STREAM_MAX_MS__
+        : 600000;
+    let finished = false;
+
+    if (showBlockingSpinner && !hadCache) {
+      setStatus('loading', 'Loading crafting (streaming)…');
+      ['hotspots-body', 'bulk-body'].forEach(id => {
+        document.getElementById(id).innerHTML =
+          `<tr><td colspan="7" class="empty"><span class="spinner"></span>Fetching from poe.ninja…</td></tr>`;
+      });
+    } else {
+      setStatus('loading', hadCache ? 'Refreshing crafting…' : 'Loading crafting…');
+    }
+
+    const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      if (_craftingEventSource) {
+        try {
+          _craftingEventSource.close();
+        } catch (e) {}
+        _craftingEventSource = null;
+      }
+      setStatus('', 'Crafting loading timed out — falling back to single request.');
+      loadCraftingFetchJson(showBlockingSpinner).then(resolve).catch(reject);
+    }, maxMs);
+
+    const es = new EventSource('/api/crafting/stream');
+    _craftingEventSource = es;
+
+    es.onmessage = (ev) => {
+      let data;
+      try {
+        data = JSON.parse(ev.data);
+      } catch (err) {
+        return;
+      }
+      if (data.error) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        try {
+          es.close();
+        } catch (e) {}
+        _craftingEventSource = null;
+        setStatus('', 'Error: ' + data.error);
+        loadCraftingFetchJson(showBlockingSpinner).then(resolve).catch(reject);
+        return;
+      }
+      const m = data.meta || {};
+      data.savedAt = new Date().toISOString();
+      _craftingPayload = data;
+      renderCraftingPage(data, { stale: false });
+      if (m.stream_done) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        try {
+          es.close();
+        } catch (e) {}
+        _craftingEventSource = null;
+        craftingWriteCache(data);
+        setStatus('ok', 'Updated ' + new Date().toLocaleTimeString());
+        resolve();
+      } else if (m.stream_progress) {
+        setStatus(
+          'loading',
+          'Crafting ' + m.stream_progress.index + '/' + m.stream_progress.total + ' · ' + m.stream_progress.category
+        );
+      }
+    };
+
+    es.onerror = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      try {
+        es.close();
+      } catch (e) {}
+      _craftingEventSource = null;
+      loadCraftingFetchJson(showBlockingSpinner).then(resolve).catch(reject);
+    };
+  });
+}
+
 async function loadCraftingInitial() {
   try {
     const { game, league } = await getActiveGameLeague();
     const cached = craftingReadCache(game, league);
-    if (cached && cached.meta && cached.hotspots && cached.bulk) {
+    const okCache =
+      cached &&
+      cached.meta &&
+      String(cached.meta.game || '').toLowerCase() === String(game).toLowerCase() &&
+      String(cached.meta.league || 'Standard') === String(league || 'Standard') &&
+      Array.isArray(cached.hotspots) &&
+      Array.isArray(cached.bulk);
+    if (okCache) {
       _craftingPayload = cached;
       renderCraftingPage(cached, { stale: true });
       setStatus('ok', 'Showing cached crafting — refreshing…');
+    } else {
+      _craftingPayload = null;
     }
   } catch (e) {}
   await loadCraftingFetch(!_craftingPayload);
@@ -2447,10 +2929,18 @@ async function loadConvertTricksInitial() {
   try {
     const { game, league } = await getActiveGameLeague();
     const cached = convertTricksReadCache(game, league);
-    if (cached && cached.meta && Array.isArray(cached.computed)) {
+    const okCache =
+      cached &&
+      cached.meta &&
+      String(cached.meta.game || '').toLowerCase() === String(game).toLowerCase() &&
+      String(cached.meta.league || 'Standard') === String(league || 'Standard') &&
+      Array.isArray(cached.computed);
+    if (okCache) {
       _convertTricksPayload = cached;
       renderConvertTricksPage(cached, { stale: true });
       setStatus('ok', 'Showing cached convert tricks — refreshing…');
+    } else {
+      _convertTricksPayload = null;
     }
   } catch (e) {}
   await loadConvertTricksFetch(!_convertTricksPayload);
@@ -2554,7 +3044,10 @@ function renderSettings(rows, leaguesForActiveGame) {
 
 // For dropdowns — save immediately on change, no Save button needed
 async function saveSettingDirect(key, value) {
-  if (key === 'GAME') flushTradeLabSave();
+  if (key === 'GAME') {
+    flushTradeLabSave();
+    invalidateAllTabPayloadsOnGameChange();
+  }
   const res = await fetch('/api/settings', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -2577,6 +3070,10 @@ async function saveSettingDirect(key, value) {
     if (key === 'FETCH_CRAFTING_FULL_SWEEP' && activePage === 'crafting') loadCraftingInitial();
     if ((key === 'FETCH_POE1_ESSENCE_EXCHANGE' || key === 'FETCH_POE1_TATTOO_OVERVIEW') && activePage === 'convert-tricks') {
       loadConvertTricksInitial();
+    }
+    if (key === 'EXCHANGE_USE_OVERVIEW_ONLY') {
+      if (activePage === 'rates') loadRatesInitial();
+      else if (activePage === 'flips') loadFlipsInitial();
     }
   } else {
     setStatus('', 'Error: ' + data.error);
@@ -2732,6 +3229,7 @@ async function saveActiveLeague(value) {
     return;
   }
   setStatus('ok', 'Saved league');
+  invalidateAllTabPayloadsOnGameChange();
   await updateLeagueBadge();
   if (activePage === 'rates') loadRatesInitial();
   else if (activePage === 'flips') loadFlipsInitial();
@@ -2742,6 +3240,7 @@ async function saveActiveLeague(value) {
 
 async function switchGame(game) {
   flushTradeLabSave();
+  invalidateAllTabPayloadsOnGameChange();
   await fetch('/api/settings', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -2762,12 +3261,12 @@ async function switchGame(game) {
 
 function tradeNamesStorageKey(game) {
   const g = (game || 'poe2').toString().toLowerCase();
-  return 'flipper_trade_names_v2_' + g;
+  return 'flipping_trade_names_v2_' + g;
 }
 
 function tradeLabSectionsStorageKey(game) {
   const g = (game || 'poe2').toString().toLowerCase();
-  return 'flipper_trade_lab_sections_v3_' + g;
+  return 'flipping_trade_lab_sections_v3_' + g;
 }
 
 const TRADE_NAMES_SEED = [
@@ -2781,11 +3280,16 @@ let _tradeLabSaveTimer;
 
 function tradeLabSectionsReadRaw(game) {
   const g = (game || 'poe2').toString().toLowerCase();
-  let raw = localStorage.getItem(tradeLabSectionsStorageKey(g));
+  let raw = lsGetMigrate(tradeLabSectionsStorageKey(g));
   if (raw) return raw;
   if (g === 'poe2') {
     raw = localStorage.getItem('flipper_trade_lab_sections_v2')
       || localStorage.getItem('flipper_trade_lab_sections_v1');
+    if (raw) {
+      try {
+        localStorage.setItem(tradeLabSectionsStorageKey('poe2'), raw);
+      } catch (e) {}
+    }
   }
   return raw || null;
 }
@@ -2863,7 +3367,7 @@ function getTradeNameDictionary(game) {
   const g = (game || getActiveGameSync()).toString().toLowerCase();
   const key = tradeNamesStorageKey(g);
   try {
-    let raw = localStorage.getItem(key);
+    let raw = lsGetMigrate(key);
     if (!raw) {
       raw = localStorage.getItem('flipper_trade_names_v1');
       if (raw) {
@@ -2970,8 +3474,8 @@ async function refreshTradeLabSuggestionsClick() {
     _ratesPayload && _ratesPayload.all_rates ? _ratesPayload.all_rates : [],
     _ratesPayload && _ratesPayload.meta && _ratesPayload.meta.game ? _ratesPayload.meta.game : game
   );
-  await loadTradeLabSuggestions();
-  setStatus('ok', 'Updated');
+  const ok = await loadTradeLabSuggestions();
+  if (ok) setStatus('ok', 'Updated ' + new Date().toLocaleTimeString());
 }
 
 function wireTradePairInputs() {
@@ -3013,10 +3517,9 @@ async function loadTradeLabPage() {
 
 function tradeSuggestSortStorageKey(game) {
   const g = (game || 'poe2').toString().toLowerCase();
-  return 'flipper_trade_suggest_sort_v2_' + g;
+  return 'flipping_trade_suggest_sort_v2_' + g;
 }
 
-let _tradeSuggestRows = [];
 let _tradeSuggestPoe2 = false;
 let _tradeSuggestSortKey = 'spread_pct';
 let _tradeSuggestSortDir = 'desc';
@@ -3024,7 +3527,7 @@ let _tradeSuggestSortDir = 'desc';
 function tradeSuggestLoadSortFromStorage(game) {
   try {
     const g = (game || getActiveGameSync()).toString().toLowerCase();
-    let raw = localStorage.getItem(tradeSuggestSortStorageKey(g));
+    let raw = lsGetMigrate(tradeSuggestSortStorageKey(g));
     if (!raw && g === 'poe2') {
       raw = localStorage.getItem('flipper_trade_suggest_sort_v1');
       if (raw) {
@@ -3103,6 +3606,11 @@ function renderTradeSuggestTable() {
 }
 
 async function loadTradeLabSuggestions() {
+  const tbody = document.getElementById('trade-suggest-body');
+  if (tbody) {
+    tbody.innerHTML =
+      '<tr><td colspan="7" class="empty"><span class="spinner"></span>Loading suggestions…</td></tr>';
+  }
   try {
     const d = await fetchJsonOk('/api/trade-suggestions');
     const game = (d.meta && d.meta.game) || getActiveGameSync();
@@ -3120,12 +3628,15 @@ async function loadTradeLabSuggestions() {
       return `<tr><td>${x.name || '—'}</td><td class="dim">${detail || '—'}</td></tr>`;
     }).join('');
     cross.innerHTML = cr || '<tr><td colspan="2" class="empty">No cross hints</td></tr>';
+    return true;
   } catch (e) {
-    const inner = loadErrorRetryHtml(e.message, 'loadTradeLabSuggestions()');
+    setStatus('', 'Error: ' + e.message);
+    const inner = loadErrorRetryHtml('Failed to load: ' + e.message, 'refreshTradeLabSuggestionsClick()');
     document.getElementById('trade-suggest-body').innerHTML =
       `<tr><td colspan="7" class="empty c-red">${inner}</td></tr>`;
     const cross = document.getElementById('trade-cross-body');
     if (cross) cross.innerHTML = '<tr><td colspan="2" class="empty c-dim">Cross hints unavailable until suggestions load</td></tr>';
+    return false;
   }
 }
 
@@ -3224,6 +3735,7 @@ document.addEventListener('pagehide', () => { flushTradeLabSave(); });
   wireTradePairInputs();
   await loadRatesInitial();
   startRatesAutoRefresh();
+  maybeShowFirstRunHint();
 })();
 </script>
 </body>

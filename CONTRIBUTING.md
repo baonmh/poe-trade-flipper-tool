@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve POE Trade Flipper.
+Thanks for helping improve POE Trade Flipping.
 
 ## How to contribute
 
@@ -9,6 +9,7 @@ Thanks for helping improve POE Trade Flipper.
 3. Keep pull requests **focused** (one feature or fix per PR).
 4. Match existing **code style** (formatting, naming, minimal unrelated diffs).
 5. If you change behavior visible in the UI, add a short note in **CHANGELOG.md** under `[Unreleased]`.
+6. Optional: add or refresh **README screenshots** under **`docs/screenshots/`** (see **`docs/screenshots/README.md`**).
 
 ## Running locally
 
@@ -19,7 +20,7 @@ python app.py
 
 ### Tests
 
-Smoke tests (no live API calls to poe.ninja):
+Smoke tests (no live poe.ninja / GGG calls; economy routes mocked; **`/api/leagues`** tests offline fallback; plus **`POST`** **`/api/trade-pair-diff`** and **`/api/clear-cache`**):
 
 ```bash
 python -m unittest discover -s tests -v
@@ -27,27 +28,24 @@ python -m unittest discover -s tests -v
 
 ### PyInstaller (optional)
 
-To build the **PyInstaller** folder locally on **Windows or macOS** (see `poe-trade-flipper.spec`):
+To build the **PyInstaller** folder locally on **Windows or macOS** (see `poe-trade-flipping.spec`):
 
 ```bash
 pip install -r requirements-build.txt
-pyinstaller poe-trade-flipper.spec
+pyinstaller poe-trade-flipping.spec
 ```
 
 ### Tagged releases (maintainers)
 
-Update **`CHANGELOG.md`** (move `[Unreleased]` into a dated section), then create and push a version tag, for example:
+Full step-by-step checklist: **[RELEASING.md](RELEASING.md)** (changelog edit, tests, tag commands, GitHub Release notes, checksums).
 
-```bash
-git tag -a v0.4.0 -m "Release 0.4.0"
-git push origin v0.4.0
-```
-
-The [Release workflow](.github/workflows/release.yml) builds Windows + macOS bundles and attaches **`poe-trade-flipper-windows.zip`**, **`poe-trade-flipper-macos.zip`**, and **`SHA256SUMS-release.txt`** to the GitHub Release for that tag.
+The [Release workflow](.github/workflows/release.yml) builds Windows + macOS bundles and attaches **`poe-trade-flipping-windows.zip`**, **`poe-trade-flipping-macos.zip`**, and **`SHA256SUMS-release.txt`** to the GitHub Release for that tag.
 
 ## Maintaining a fork
 
 If you publish your own build: optional donation link and label live in **`config.py`** (`DONATION_URL`, `DONATION_LABEL`). GitHub’s **Sponsor** menu is configured in **`.github/FUNDING.yml`** ([docs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository)).
+
+Optional **community** link (e.g. Discord): set **`COMMUNITY_URL`** and **`COMMUNITY_LABEL`** in **`config.py`** — the **About** modal shows them when **`COMMUNITY_URL`** is non-empty.
 
 ## What we won’t merge
 

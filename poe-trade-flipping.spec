@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec — onedir bundle (faster startup than onefile for Flask).
-# Run: pyinstaller poe-trade-flipper.spec  (after pip install -r requirements-build.txt)
+# Run: pyinstaller poe-trade-flipping.spec  (after pip install -r requirements-build.txt)
 
 block_cipher = None
 
@@ -49,7 +49,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="poe-trade-flipper",
+    name="poe-trade-flipping",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -70,5 +70,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="poe-trade-flipper",
+    name="poe-trade-flipping",
 )

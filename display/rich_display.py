@@ -1,5 +1,5 @@
 """
-Rich terminal display for POE2 Flipper.
+Rich terminal display for POE Trade Flipping.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def _volume(v: int) -> str:
 def header(league: str, game: str) -> None:
     now = datetime.datetime.now().strftime("%H:%M:%S")
     console.print(Panel(
-        f"[bold {GOLD}]POE2 Currency Flipper[/bold {GOLD}]  "
+        f"[bold {GOLD}]POE Trade Flipping[/bold {GOLD}]  "
         f"[{DIM}]League:[/{DIM}] [{WHITE}]{league}[/{WHITE}]  "
         f"[{DIM}]Game:[/{DIM}] [{WHITE}]{game.upper()}[/{WHITE}]  "
         f"[{DIM}]Updated:[/{DIM}] [{WHITE}]{now}[/{WHITE}]",

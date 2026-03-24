@@ -1,15 +1,16 @@
 """
-POE2 Flipper — Web UI (Flask)
+POE Trade Flipping — Web UI (Flask)
 Run: python app.py  → opens browser at http://127.0.0.1:5000 (loopback only)
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
 import webbrowser
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, stream_with_context
 
 import config
 import settings as cfg
@@ -46,8 +47,14 @@ def inject_ui_meta() -> dict:
     """About / Support links from config (see DONATION_URL, GITHUB_REPO_URL)."""
     return {
         "donation_url": (getattr(config, "DONATION_URL", "") or "").strip(),
-        "donation_label": getattr(config, "DONATION_LABEL", "PayPal") or "PayPal",
-        "repo_url": getattr(config, "GITHUB_REPO_URL", "https://github.com/baonmh/poe-trade-flipper-tool"),
+        "donation_label": getattr(config, "DONATION_LABEL", "Buy me a coffee") or "Buy me a coffee",
+        "repo_url": getattr(config, "GITHUB_REPO_URL", "https://github.com/baonmh/poe-trade-flipping-tool"),
+        "community_url": (getattr(config, "COMMUNITY_URL", "") or "").strip(),
+        "community_label": getattr(config, "COMMUNITY_LABEL", "Community") or "Community",
+        "rates_streaming": bool(getattr(config, "RATES_USE_STREAMING", True)),
+        "rates_stream_max_ms": int(float(getattr(config, "RATES_STREAM_MAX_SEC", 600) or 600) * 1000),
+        "flips_streaming": bool(getattr(config, "FLIPS_USE_STREAMING", True)),
+        "crafting_streaming": bool(getattr(config, "CRAFTING_USE_STREAMING", True)),
     }
 
 
@@ -79,11 +86,8 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/rates")
-def api_rates():
-    game = cfg.get("GAME")
-    league = cfg.active_league()
-    rates = ninja.get_currency_rates(league, game)
+def rates_payload_from_rates(rates, game: str, league: str) -> dict:
+    """Build the same JSON shape as GET /api/rates from a merged CurrencyRate list."""
     key_rates = key_rates_visible(rates, game)
     cpd = get_chaos_per_divine(rates)
     cpe = get_chaos_per_exalted(rates)
@@ -138,7 +142,7 @@ def api_rates():
             row["profit_raw_ex"] = 0.0
         all_rows.append(row)
 
-    return jsonify({
+    return {
         "meta": {
             "game": game,
             "league": league,
@@ -147,21 +151,85 @@ def api_rates():
             "chaos_per_exalted": cpe,
             "max_buy_chaos": float(cfg.get("MAX_BUY_COST_CHAOS") or 0.0),
             "max_buy_exalted": float(cfg.get("MAX_BUY_COST_EXALTED") or 0.0),
+            "exchange_overview_only": bool(cfg.get("EXCHANGE_USE_OVERVIEW_ONLY")),
         },
         "stat_cards": _stat_cards_key_rates(cpd, cpe),
         "chaos_per_divine": cpd,
         "chaos_per_exalted": cpe,
         "rates": rate_rows,
         "all_rates": all_rows,
-    })
+    }
 
 
-def _flip_row(o, cpe: float, cpd: float, poe2: bool) -> dict:
+@app.route("/api/rates")
+def api_rates():
+    game = cfg.get("GAME")
+    league = cfg.active_league()
+    rates = ninja.get_currency_rates(league, game)
+    return jsonify(rates_payload_from_rates(rates, game, league))
+
+
+@app.route("/api/economy/stream")
+def api_economy_stream():
+    """SSE: one poe.ninja economy pass; each event has rates + flips (same merged batch)."""
+
+    @stream_with_context
+    def generate():
+        game = cfg.get("GAME")
+        league = cfg.active_league()
+        try:
+            for i, tot, label, merged in ninja.iter_currency_rates_batches(league, game):
+                rp = rates_payload_from_rates(merged, game, league)
+                fp = flips_payload_from_rates(merged, game, league)
+                done = i >= tot
+                for p in (rp, fp):
+                    p["meta"]["stream_done"] = done
+                    if not done:
+                        p["meta"]["stream_progress"] = {"index": i, "total": tot, "category": label}
+                    else:
+                        p["meta"].pop("stream_progress", None)
+                if done:
+                    ninja.store_currency_rates_cache(league, game, merged)
+                envelope = {
+                    "rates": rp,
+                    "flips": fp,
+                    "meta": {
+                        "game": game,
+                        "league": league,
+                        "stream_done": done,
+                        **(
+                            {}
+                            if done
+                            else {"stream_progress": {"index": i, "total": tot, "category": label}}
+                        ),
+                    },
+                }
+                yield f"data: {json.dumps(envelope, ensure_ascii=False)}\n\n"
+        except TimeoutError as e:
+            err = {"error": str(e), "meta": {"stream_done": True, "stream_failed": True}}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            err = {"error": str(e), "meta": {"stream_done": True, "stream_failed": True}}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+def _flip_row(o, cpe: float, cpd: float, poe2: bool, sell_icon: str = "") -> dict:
     # Internal flip math stays in chaos; POE2 surfaces exalted as primary display units.
     row = {
         "name": o.name,
         "buy_currency": o.buy_currency,
         "sell_currency": o.sell_currency,
+        "icon": sell_icon or "",
         "profit_pct": round(o.profit_percent, 1),
         "volume": o.volume,
         "listings": o.listings,
@@ -191,16 +259,16 @@ def _flip_row(o, cpe: float, cpd: float, poe2: bool) -> dict:
     return row
 
 
-@app.route("/api/flips")
-def api_flips():
-    game = cfg.get("GAME")
-    league = cfg.active_league()
-    rates = ninja.get_currency_rates(league, game)
+def flips_payload_from_rates(rates, game: str, league: str) -> dict:
     cpe = get_chaos_per_exalted(rates)
     cpd = get_chaos_per_divine(rates)
     direct = find_direct_flips(rates, game)
     poe2 = game == "poe2"
-    return jsonify({
+    icon_by_name: dict[str, str] = {}
+    for r in rates:
+        if r.name not in icon_by_name:
+            icon_by_name[r.name] = getattr(r, "icon", "") or ""
+    return {
         "meta": {
             "game": game,
             "league": league,
@@ -208,26 +276,23 @@ def api_flips():
             "chaos_per_exalted": cpe,
             "chaos_per_divine": cpd,
         },
-        "direct": [_flip_row(o, cpe, cpd, poe2) for o in direct],
-    })
+        "direct": [
+            _flip_row(o, cpe, cpd, poe2, icon_by_name.get(o.sell_currency, ""))
+            for o in direct
+        ],
+    }
 
 
-@app.route("/api/crafting")
-def api_crafting():
-    game = cfg.get("GAME")
-    league = cfg.active_league()
-    full_craft = bool(cfg.get("FETCH_CRAFTING_FULL_SWEEP"))
-    items = ninja.get_all_crafting_items(league, game) if full_craft else []
-    cur = ninja.get_currency_rates(league, game)
-    cpe = get_chaos_per_exalted(cur)
+def crafting_payload_from_items(items, game: str, league: str, cpe: float, full_craft: bool) -> dict:
     poe2 = game == "poe2"
-    hotspots = get_top_crafting_items(items)
-    bulk = find_bulk_flip_targets(items)
+    hotspots = get_top_crafting_items(items) if full_craft else []
+    bulk = find_bulk_flip_targets(items) if full_craft else []
 
     def hz(h):
         d = {
             "name": h.name,
             "type": h.item_type,
+            "icon": getattr(h, "icon", "") or "",
             "chaos_value": round(h.chaos_value, 2),
             "divine_value": round(h.divine_value, 4),
             "volume": h.trade_volume,
@@ -244,6 +309,7 @@ def api_crafting():
         d = {
             "name": i.name,
             "type": i.item_type,
+            "icon": getattr(i, "icon", "") or "",
             "chaos_value": round(i.chaos_value, 2),
             "volume": i.count,
             "listings": i.listing_count,
@@ -254,7 +320,7 @@ def api_crafting():
             d["exalted_value"] = 0.0
         return d
 
-    return jsonify({
+    return {
         "meta": {
             "game": game,
             "league": league,
@@ -264,7 +330,70 @@ def api_crafting():
         },
         "hotspots": [hz(h) for h in hotspots],
         "bulk": [bk(i) for i in bulk],
-    })
+    }
+
+
+@app.route("/api/flips")
+def api_flips():
+    game = cfg.get("GAME")
+    league = cfg.active_league()
+    rates = ninja.get_currency_rates(league, game)
+    return jsonify(flips_payload_from_rates(rates, game, league))
+
+
+@app.route("/api/crafting")
+def api_crafting():
+    game = cfg.get("GAME")
+    league = cfg.active_league()
+    full_craft = bool(cfg.get("FETCH_CRAFTING_FULL_SWEEP"))
+    items = ninja.get_all_crafting_items(league, game) if full_craft else []
+    cur = ninja.get_currency_rates(league, game)
+    cpe = get_chaos_per_exalted(cur)
+    return jsonify(crafting_payload_from_items(items, game, league, cpe, full_craft))
+
+
+@app.route("/api/crafting/stream")
+def api_crafting_stream():
+    """SSE: one payload per crafting item category (accumulated hotspots/bulk)."""
+
+    @stream_with_context
+    def generate():
+        game = cfg.get("GAME")
+        league = cfg.active_league()
+        full_craft = bool(cfg.get("FETCH_CRAFTING_FULL_SWEEP"))
+        cur = ninja.get_currency_rates(league, game)
+        cpe = get_chaos_per_exalted(cur)
+        try:
+            if not full_craft:
+                payload = crafting_payload_from_items([], game, league, cpe, False)
+                payload["meta"]["stream_done"] = True
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                return
+            for i, tot, cat, items in ninja.iter_crafting_item_batches(league, game):
+                payload = crafting_payload_from_items(items, game, league, cpe, True)
+                done = i >= tot
+                payload["meta"]["stream_done"] = done
+                if not done:
+                    payload["meta"]["stream_progress"] = {"index": i, "total": tot, "category": cat}
+                else:
+                    payload["meta"].pop("stream_progress", None)
+                yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+        except TimeoutError as e:
+            err = {"error": str(e), "meta": {"stream_done": True, "stream_failed": True}}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            err = {"error": str(e), "meta": {"stream_done": True, "stream_failed": True}}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.route("/api/convert-tricks")
@@ -388,7 +517,7 @@ def api_leagues():
         resp = requests.get(
             "https://api.pathofexile.com/leagues",
             params={"type": "main", "compact": "1", "realm": realm},
-            headers={"User-Agent": "POE2-Flipper/1.0"},
+            headers={"User-Agent": "POE-Trade-Flipping/1.0"},
             timeout=8,
         )
         resp.raise_for_status()

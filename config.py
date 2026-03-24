@@ -1,5 +1,5 @@
 """
-POE2 Flipper Configuration
+POE Trade Flipping — configuration
 """
 
 # === League Settings (one per game — different GGG realms) ===
@@ -21,12 +21,14 @@ GAME = "poe2"                # "poe2" or "poe1"
 POE1_CHALLENGE_LEAGUE_TOKEN = "Mirage"
 POE2_CHALLENGE_LEAGUE_TOKEN = "Fate of the Vaal"
 
-# === Donation / links (optional) — PayPal only ===
-# Set DONATION_URL to your PayPal.me link or hosted PayPal donation URL, e.g. https://paypal.me/yourname
-# Empty = hide the header link and About donation line.
-GITHUB_REPO_URL = "https://github.com/baonmh/poe-trade-flipper-tool"
+# === Donation / links (optional) ===
+# Set DONATION_URL to PayPal.me, Ko-fi, etc. Empty = hide the header link and About donation line.
+GITHUB_REPO_URL = "https://github.com/baonmh/poe-trade-flipping-tool"
 DONATION_URL = "https://paypal.me/BaoNguyen385"
-DONATION_LABEL = "PayPal"
+DONATION_LABEL = "Buy me a coffee"
+# Optional community link (e.g. Discord invite). Empty = hidden in About.
+COMMUNITY_URL = ""
+COMMUNITY_LABEL = "Discord"
 
 # === poe.ninja API (avoid 429: sequential /details + delays; tune if needed) ===
 POE_NINJA_DETAIL_DELAY_SEC = 0.12   # pause after each exchange /details request
@@ -44,6 +46,17 @@ POE_NINJA_ITEM_URL = f"{POE_NINJA_BASE}/itemoverview"
 FETCH_POE1_ESSENCE_EXCHANGE = True   # Convert Tricks POE1: Essence exchange category (many /details)
 FETCH_POE1_TATTOO_OVERVIEW = True    # Convert Tricks POE1: Tattoo exchange overview (colour map)
 FETCH_CRAFTING_FULL_SWEEP = True     # Crafting: all item categories in CRAFTING_CATEGORIES
+# Exchange categories (POE1/POE2 economy tabs): overview only — no per-line /details (much faster; spreads ~0%).
+EXCHANGE_USE_OVERVIEW_ONLY = False
+
+# Rates + Flips: one progressive SSE (GET /api/economy/stream) when either flag is True — single poe.ninja economy pass; each event includes rates + flips JSON. False = use GET /api/rates and GET /api/flips separately.
+RATES_USE_STREAMING = True
+# Max wall-clock time for streaming refresh (seconds); server stops with TimeoutError after this.
+RATES_STREAM_MAX_SEC = 600
+# Included in the same /api/economy/stream as Rates when True (no second economy fetch).
+FLIPS_USE_STREAMING = True
+# Crafting: separate SSE over item categories (still uses merged currency cache for chaos/exalt).
+CRAFTING_USE_STREAMING = True
 
 # === POE1 Harvest (Horticrafting) — lifeforce per full stack (verify in-game; patch-dependent) ===
 # Deafening essence reroll: common bench uses 270 Primal Crystallised Lifeforce per 9 essences in the stack.
@@ -59,8 +72,9 @@ MIN_VOLUME = 5              # Minimum trade volume to consider a pair liquid eno
 MIN_BUY_COST_CHAOS = 0.5    # POE1: ignore currencies cheaper than this (chaos)
 MIN_BUY_COST_EXALTED = 0.02 # POE2: ignore currencies cheaper than this (exalted)
 # Max buy (0 = no limit): hide key rates / spread rows / flips where buying 1 unit costs more than this.
-MAX_BUY_COST_CHAOS = 0.0    # POE1: max buy cost (chaos); excludes Mirror-tier when set
-MAX_BUY_COST_EXALTED = 0.0  # POE2: max buy cost (exalted)
+# Default 999999 shows effectively everything; lower in Settings to filter expensive pairs.
+MAX_BUY_COST_CHAOS = 999999.0    # POE1: max buy cost (chaos)
+MAX_BUY_COST_EXALTED = 999999.0  # POE2: max buy cost (exalted)
 
 # === Full economy (poe.ninja exchange `type=` + display label) ===
 # POE2: /poe2/api/economy/exchange/current/overview|details — detail fetch per line for accurate chaos.

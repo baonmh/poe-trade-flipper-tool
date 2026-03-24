@@ -7,7 +7,7 @@ on:
     branches: [main]
     paths:
       - "app.py"
-      - "poe-trade-flipper.spec"
+      - "poe-trade-flipping.spec"
       - "requirements.txt"
       - "requirements-build.txt"
       - "templates/**"
@@ -31,17 +31,17 @@ jobs:
         run: pip install -r requirements-build.txt
 
       - name: Build
-        run: pyinstaller poe-trade-flipper.spec
+        run: pyinstaller poe-trade-flipping.spec
 
       - name: SHA256 (exe)
         shell: pwsh
         run: |
-          $p = "dist/poe-trade-flipper/poe-trade-flipper.exe"
+          $p = "dist/poe-trade-flipping/poe-trade-flipping.exe"
           $h = (Get-FileHash -Algorithm SHA256 $p).Hash
-          "$h  poe-trade-flipper.exe" | Out-File -Encoding ascii dist/poe-trade-flipper/SHA256SUMS.txt
-          Get-Content dist/poe-trade-flipper/SHA256SUMS.txt
+          "$h  poe-trade-flipping.exe" | Out-File -Encoding ascii dist/poe-trade-flipping/SHA256SUMS.txt
+          Get-Content dist/poe-trade-flipping/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: poe-trade-flipper-windows
-          path: dist/poe-trade-flipper/
+          name: poe-trade-flipping-windows
+          path: dist/poe-trade-flipping/
